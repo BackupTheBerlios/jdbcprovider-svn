@@ -104,8 +104,7 @@ public abstract class JDBCBaseProvider
 
         // make sure the queries we need are in the properties
         loadQueries(properties, new String[]{"checkConnection"});
-        String [] queryKeys = getQueryKeys();   // from subclass
-        loadQueries(properties, queryKeys);
+        loadQueries(properties, getQueryKeys());   // from subclass
 
         m_sharedConnection = null;
         m_connectionPool = null;
