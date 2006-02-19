@@ -68,8 +68,6 @@ CREATE TABLE WIKI_ATT
     );
 */
 
-    private static final String ATT_TABLE_NAME = "WIKI_ATT";
-
     protected static final Category log = Category.getInstance( JDBCAttachmentProvider.class );
 
     public String getProviderInfo()
@@ -81,14 +79,6 @@ CREATE TABLE WIKI_ATT
     {
         debug( "Initializing JDBCAttachmentProvider" );
         super.initialize( engine, properties);
-        try
-        {
-            checkQuery( JDBCAttachmentProvider.ATT_TABLE_NAME );
-        }
-        catch( SQLException e )
-        {
-            throw new IOException( "SQL Exception: " + e.getMessage() );
-        }
         int n = getAttachmentCount();
         String migrationPath = properties.getProperty( getPropertyBase() + "migrateFrom" );
         if( n == 0 && migrationPath != null )
@@ -106,7 +96,8 @@ CREATE TABLE WIKI_ATT
     }
 
     protected String[] getQueryKeys() {
-        return new String[0];
+        return new String[]{"getCount", "insert", "getData", "getList", "getChanged", "getInfo",
+                        "getLatestVersion", "getVersions", "deleteVersion", "delete", "move"};
     }
 
     public int getAttachmentCount()
@@ -116,7 +107,8 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT COUNT(*) FROM " + ATT_TABLE_NAME;
+            String sql = getQuery("getCount");
+            // SELECT COUNT(*) FROM WIKI_ATT
             Statement stmt = connection.createStatement();
             ResultSet rs = stmt.executeQuery( sql );
             rs.next();
@@ -148,10 +140,11 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "INSERT INTO " + ATT_TABLE_NAME +
-                    " (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION," +
-                    "  ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA)" +
-                    " VALUES (?, ?, ?, ?, ?, ?)";
+            String sql = getQuery("insert");
+            // INSERT INTO WIKI_ATT
+            // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA)
+            // VALUES (?, ?, ?, ?, ?, ?)
+
             PreparedStatement psPage = connection.prepareStatement( sql );
             psPage.setString( 1, att.getParentName() );
             psPage.setString( 2, att.getFileName() );
@@ -188,10 +181,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT ATT_DATA FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    " AND ATT_FILENAME = ?" +
-                    " AND ATT_VERSION = ?";
+            String sql = getQuery("getData");
+            // SELECT ATT_DATA FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
@@ -200,9 +192,8 @@ CREATE TABLE WIKI_ATT
 
             if( rs.next() )
             {
-                byte[] bytes = rs.getBytes( "ATT_DATA" );
+                byte[] bytes = rs.getBytes( 1 );
                 result = new ByteArrayInputStream( bytes );
-                //result = rs.getBinaryStream("VERSION_TEXT");
             }
             else
             {
@@ -231,13 +222,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT LENGTH(ATT_DATA)," +
-                    " ATT_FILENAME, " +
-                    " ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION" +
-                    " FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    " GROUP BY ATT_FILENAME" +
-                    " ORDER BY ATT_VERSION DESC";   // so latest version is first
+            String sql = getQuery("getList");
+            // SELECT LENGTH(ATT_DATA), ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? GROUP BY ATT_FILENAME ORDER BY ATT_VERSION DESC
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page.getName() );
             ResultSet rs = ps.executeQuery();
@@ -246,15 +233,15 @@ CREATE TABLE WIKI_ATT
             while( rs.next() )
             {
                 int size = rs.getInt( 1 );
-                String fileName = rs.getString( "ATT_FILENAME" );
+                String fileName = rs.getString( 2 );
                 if( fileName.equals( previousFileName ) )
                     continue;   // only add latest version
                 Attachment att = new Attachment( getEngine(), page.getName(), fileName );
                 att.setSize( size );
                 // use Java Date for friendlier comparisons with other dates
-                att.setLastModified(new java.util.Date(rs.getTimestamp("ATT_MODIFIED").getTime()));
-                att.setAuthor( rs.getString( "ATT_MODIFIED_BY" ) );
-                att.setVersion( rs.getInt( "ATT_VERSION" ) );
+                att.setLastModified(new java.util.Date(rs.getTimestamp(3).getTime()));
+                att.setAuthor( rs.getString( 4 ) );
+                att.setVersion( rs.getInt( 5 ) );
                 result.add( att );
             }
             rs.close();
@@ -285,23 +272,21 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT ATT_PAGENAME, ATT_FILENAME," +
-                    " LENGTH(ATT_DATA)," +
-                    " ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION" +
-                    " FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_MODIFIED > ?" +
-                    " ORDER BY ATT_MODIFIED DESC";
+            String sql = getQuery("getChanged");
+            // SELECT ATT_PAGENAME, ATT_FILENAME, LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION
+            // FROM WIKI_ATT WHERE ATT_MODIFIED > ? ORDER BY ATT_MODIFIED DESC
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setTimestamp( 1, new Timestamp( timestamp.getTime() ) );
             ResultSet rs = ps.executeQuery();
             while( rs.next() )
             {
-                Attachment att = new Attachment( getEngine(), rs.getString( "ATT_PAGENAME" ), rs.getString( "ATT_FILENAME" ) );
+                Attachment att = new Attachment( getEngine(), rs.getString( 1 ), rs.getString( 2 ) );
                 att.setSize( rs.getInt( 3 ) );
                 // use Java Date for friendlier comparisons with other dates
-                att.setLastModified(new java.util.Date(rs.getTimestamp("ATT_MODIFIED").getTime()));
-                att.setAuthor( rs.getString( "ATT_MODIFIED_BY" ) );
-                att.setVersion( rs.getInt( "ATT_VERSION" ) );
+                att.setLastModified(new java.util.Date(rs.getTimestamp(4).getTime()));
+                att.setAuthor( rs.getString( 5 ) );
+                att.setVersion( rs.getInt( 6 ) );
                 changedList.add( att );
             }
             rs.close();
@@ -325,14 +310,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT LENGTH(ATT_DATA)," +
-                    " ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION" +
-                    " FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    "    AND ATT_FILENAME = ?" +
-                    "    AND ATT_VERSION = ?" +
-                    " GROUP BY ATT_FILENAME" +
-                    " ORDER BY ATT_VERSION DESC";   // so latest version is first
+            String sql = getQuery("getInfo");   // latest version is first
+            // SELECT LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page.getName() );
             ps.setString( 2, name );
@@ -345,9 +325,9 @@ CREATE TABLE WIKI_ATT
                 att = new Attachment( getEngine(), page.getName(), name );
                 att.setSize( rs.getInt( 1 ) );
                 // use Java Date for friendlier comparisons with other dates
-                att.setLastModified(new java.util.Date(rs.getTimestamp("ATT_MODIFIED").getTime()));
-                att.setAuthor( rs.getString( "ATT_MODIFIED_BY" ) );
-                att.setVersion( rs.getInt( "ATT_VERSION" ) );
+                att.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
+                att.setAuthor( rs.getString( 3 ) );
+                att.setVersion( version );
             }
             else
             {
@@ -382,19 +362,16 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT ATT_VERSION" +
-                    " FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    "   AND ATT_FILENAME = ?" +
-                    " ORDER BY ATT_VERSION DESC" + // so latest version is first
-                    " LIMIT 1"; // and only take the first
+            String sql = getQuery("getLatestVersion");
+            // SELECT ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC LIMIT 1
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
             ResultSet rs = ps.executeQuery();
 
             if( rs.next() )
-                version = rs.getInt( "ATT_VERSION" );
+                version = rs.getInt( 1 );
             rs.close();
             ps.close();
 
@@ -417,12 +394,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "SELECT LENGTH(ATT_DATA)," +
-                    " ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION" +
-                    " FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    "   AND ATT_FILENAME = ?" +
-                    " ORDER BY ATT_VERSION DESC";   // so latest version is first
+            String sql = getQuery("getVersions");   // latest version is first
+            // SELECT LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
@@ -433,9 +407,9 @@ CREATE TABLE WIKI_ATT
                 Attachment vAtt = new Attachment( getEngine(), att.getParentName(), att.getFileName() );
                 vAtt.setSize( rs.getInt( 1 ) );
                 // use Java Date for friendlier comparisons with other dates
-                vAtt.setLastModified(new java.util.Date(rs.getTimestamp("ATT_MODIFIED").getTime()));
-                vAtt.setAuthor( rs.getString( "ATT_MODIFIED_BY" ) );
-                vAtt.setVersion( rs.getInt( "ATT_VERSION" ) );
+                vAtt.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
+                vAtt.setAuthor( rs.getString(3) );
+                vAtt.setVersion( rs.getInt(4) );
                 list.add( vAtt );
             }
             rs.close();
@@ -459,10 +433,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "DELETE FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    "   AND ATT_FILENAME = ?" +
-                    "   AND ATT_VERSION = ?";
+            String sql = getQuery("deleteVersion");
+            // DELETE FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
@@ -486,9 +459,9 @@ CREATE TABLE WIKI_ATT
         try
         {
             connection = getConnection();
-            String sql = "DELETE FROM " + ATT_TABLE_NAME +
-                    " WHERE ATT_PAGENAME = ?" +
-                    "   AND ATT_FILENAME = ?";
+            String sql = getQuery("delete");
+            // DELETE FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ?
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
@@ -519,9 +492,9 @@ CREATE TABLE WIKI_ATT
         Connection connection = null;
         try {
             connection = getConnection();
-            String sql = "UPDATE " + ATT_TABLE_NAME +
-                         "  SET ATT_PAGE_NAME = ?" +
-                         " WHERE ATT_PAGE_NAME = ?";
+            String sql = getQuery("move");
+            // UPDATE WIKI_ATT SET ATT_PAGE_NAME = ? WHERE ATT_PAGE_NAME = ?
+
             PreparedStatement ps = connection.prepareStatement(sql);
             ps.setString(1, oldParent);
             ps.setString(2, newParent);
