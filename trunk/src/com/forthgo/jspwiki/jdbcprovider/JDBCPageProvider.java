@@ -122,22 +122,10 @@ GO
     protected static final int ONE_MINUTE = 60 * 1000;    // in milliseconds
     protected int m_continuationEditTimeout = 60 * ONE_MINUTE;    // one hour in milliseconds
 
-    private static final String PAGE_TABLE_NAME = "WIKI_PAGE";
-    private static final String PAGE_VERSIONS_TABLE_NAME = "WIKI_PAGE_VERSIONS";
-
     public void initialize(WikiEngine engine, Properties properties) throws NoRequiredPropertyException, IOException
     {
         debug( "Initializing JDBCPageProvider" );
         super.initialize( engine, properties );
-        try
-        {
-            checkQuery( JDBCPageProvider.PAGE_TABLE_NAME );
-            checkQuery( JDBCPageProvider.PAGE_VERSIONS_TABLE_NAME );
-        }
-        catch( SQLException e )
-        {
-            throw new IOException( "SQL Exception: " + e.getMessage() );
-        }
         m_continuationEditTimeout = TextUtil.getIntegerProperty(properties, getPropertyBase() + "continuationEditMinutes", 0);
         m_continuationEditTimeout *= ONE_MINUTE;
         int n = getPageCount();
@@ -346,7 +334,7 @@ GO
                 version += 1;
 
             sql = getQuery("updateCurrent");
-            // UPDATE WIKI_PAGE SET PAGE_MODIFIED = ? PAGE_MODIFIED_BY = ? PAGE_VERSION = ? PAGE_TEXT = ? WHERE PAGE_NAME = ?
+            // UPDATE WIKI_PAGE SET PAGE_MODIFIED = ?, PAGE_MODIFIED_BY = ?, PAGE_VERSION = ?, PAGE_TEXT = ? WHERE PAGE_NAME = ?
 
             PreparedStatement psPage = connection.prepareStatement( sql );
             Timestamp d = new Timestamp( System.currentTimeMillis() );
