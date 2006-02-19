@@ -248,7 +248,7 @@ public abstract class JDBCBaseProvider
     public boolean isConnectionOK(Connection connection)
     {
 		try {
-			String sql = getQuery("checkAlive");
+			String sql = getQuery("checkConnection");
 			Statement stmt = connection.createStatement();
 			ResultSet rs = stmt.executeQuery(sql);
 			rs.close();
@@ -308,10 +308,10 @@ public abstract class JDBCBaseProvider
     }
 
     /**
-     * Checks that a table by the given name exists.
+     * Checks that a query runs without error.
      * 
-     * @param query the sql squery
-     * @throws SQLException if the table query fails
+     * @param query the sql query
+     * @throws SQLException if the query fails
      */
     protected void checkQuery( String query ) throws SQLException
     {
