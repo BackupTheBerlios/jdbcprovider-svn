@@ -62,6 +62,7 @@ public abstract class JDBCBaseProvider
     protected String m_username = "";
     protected String m_password = "";
     protected int m_cachedConnections;
+    protected boolean m_migrating = false; // Only used during migration process
 
     /** Name of the property that defines the url for the database connection to the pages. */
     public static final String PROP_URL = "url";

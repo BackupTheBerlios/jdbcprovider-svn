@@ -33,19 +33,21 @@ import java.util.Date;
 
 /*
  * History:
- *   2006-02-12 XG Move all SQL statements into property file.
- *                 Expand implementation of Delete.
- *   2006-01-29 XG Update for JSPWiki 2.3.72 (with help from Terry Steichen)
- *                  - added engine as argument to some methods
- *                  - added movePage method now required by WikiPageProvider
- *   2005-09-28 XG Use jspwiki-s as property prefix for security.
- *   2005-09-07 XG Always use java.util.Date for LastModifield field to friendlier comparisons.
- *   2005-08-31 XG Remove legacy comment.
- *   2005-08-30 XG Added changes suggested by Gregor Hagedorn:
- *                  - removed dependence on auto-incrementing ID fields
- *                  - added "continuation edit" time-out
- *                  - added notes for SQL Server DB creation
- *   2005-08-24 XG Fixed possible resource leak with conditionally closed statements
+ *   2006-02-21 SBG When migrating the page orignal date is preserved. 
+ *                  Database creation code example now to be found in database/
+ *   2006-02-12 XG  Move all SQL statements into property file.
+ *                  Expand implementation of Delete.
+ *   2006-01-29 XG  Update for JSPWiki 2.3.72 (with help from Terry Steichen)
+ *                   - added engine as argument to some methods
+ *                   - added movePage method now required by WikiPageProvider
+ *   2005-09-28 XG  Use jspwiki-s as property prefix for security.
+ *   2005-09-07 XG  Always use java.util.Date for LastModifield field to friendlier comparisons.
+ *   2005-08-31 XG  Remove legacy comment.
+ *   2005-08-30 XG  Added changes suggested by Gregor Hagedorn:
+ *                   - removed dependence on auto-incrementing ID fields
+ *                   - added "continuation edit" time-out
+ *                   - added notes for SQL Server DB creation
+ *   2005-08-24 XG  Fixed possible resource leak with conditionally closed statements
  */
 
 /**
@@ -57,66 +59,11 @@ import java.util.Date;
  *
  * @author Thierry Lach
  * @author Xan Gregg
+ * @author Søren Berg Glasius
  */
 public class JDBCPageProvider extends JDBCBaseProvider
         implements WikiPageProvider
 {
-
-/* MySQL table creation commands:
-
-CREATE TABLE WIKI_PAGE
-    (
-        PAGE_NAME          VARCHAR (100)  NOT NULL,
-        PAGE_VERSION       INTEGER        NOT NULL,
-        PAGE_MODIFIED      DATETIME,
-        PAGE_MODIFIED_BY   VARCHAR (50),
-        PAGE_TEXT          MEDIUMTEXT,
-        PRIMARY KEY (PAGE_NAME),
-        UNIQUE (PAGE_NAME),
-        INDEX PAGE_MODIFIED_IX (PAGE_MODIFIED)
-    );
-CREATE TABLE WIKI_PAGE_VERSIONS
-    (
-        VERSION_NAME          VARCHAR (100)  NOT NULL,
-        VERSION_NUM           INTEGER        NOT NULL,
-        VERSION_MODIFIED      DATETIME,
-        VERSION_MODIFIED_BY   VARCHAR (50),
-        VERSION_TEXT          MEDIUMTEXT,
-        PRIMARY KEY (VERSION_NAME, VERSION_NUM),
-        UNIQUE (VERSION_NAME, VERSION_NUM)
-    );
-
---Script written for MS SQL Server 2000 (from Gregor Hagedorn).
--- - NVARCHAR, NTEXT support unicode, VARCHAR, TEXT do not
--- - The INDEX syntax used for MySQL does not work here, separate statement added
--- - A foreign key relation to versions has been added
-
-CREATE DATABASE YourChoiceOfName
-GO
-Use YourChoiceOfName
-
-CREATE TABLE WIKI_PAGE (
-  PAGE_NAME        NVARCHAR(100) NOT NULL ,
-  PAGE_VERSION     INTEGER NOT NULL DEFAULT 0,
-  PAGE_MODIFIED    DATETIME NULL ,
-  PAGE_MODIFIED_BY NVARCHAR(50) NULL ,
-  PAGE_TEXT        NTEXT NULL ,
-  CONSTRAINT PK_WIKI_PAGE PRIMARY KEY CLUSTERED (PAGE_NAME)
-)
-CREATE INDEX IX_PAGE_MODIFIED ON WIKI_PAGE (PAGE_MODIFIED)
-
-CREATE TABLE WIKI_PAGE_VERSIONS (
-  VERSION_NAME        NVARCHAR(100) NOT NULL ,
-  VERSION_NUM         INTEGER NOT NULL DEFAULT 0,
-  VERSION_MODIFIED    DATETIME NULL ,
-  VERSION_MODIFIED_BY NVARCHAR(50) NULL ,
-  VERSION_TEXT        NTEXT NULL ,
-  CONSTRAINT PK_WIKI_PAGE_VERSIONS PRIMARY KEY CLUSTERED (VERSION_NAME, VERSION_NUM) ,
-  CONSTRAINT FK_WIKI_PAGE_VERSIONS_WIKI_PAGE FOREIGN KEY(VERSION_NAME) REFERENCES WIKI_PAGE(PAGE_NAME)
-)
-GO
-
-*/
 
     protected static final Category log = Category.getInstance( JDBCPageProvider.class );
     protected static final int ONE_MINUTE = 60 * 1000;    // in milliseconds
@@ -269,6 +216,7 @@ GO
 
     private void insertPageText( WikiPage page, String text )
     {
+        Timestamp d;
         Connection connection = null;
         try
         {
@@ -278,7 +226,12 @@ GO
             PreparedStatement psPage = connection.prepareStatement( sql );
             psPage.setString( 1, page.getName() );
             psPage.setInt( 2, 1 );
-            Timestamp d = new Timestamp( System.currentTimeMillis() );
+            
+            if(page.getLastModified() != null) {
+                d = new Timestamp( page.getLastModified().getTime());
+            } else {
+                d = new Timestamp( System.currentTimeMillis() );
+            }
             psPage.setTimestamp( 3, d );
             psPage.setString( 4, page.getAuthor() );
             psPage.setString( 5, text );
@@ -337,7 +290,12 @@ GO
             // UPDATE WIKI_PAGE SET PAGE_MODIFIED = ?, PAGE_MODIFIED_BY = ?, PAGE_VERSION = ?, PAGE_TEXT = ? WHERE PAGE_NAME = ?
 
             PreparedStatement psPage = connection.prepareStatement( sql );
-            Timestamp d = new Timestamp( System.currentTimeMillis() );
+            Timestamp d;
+            if(m_migrating && page.getLastModified() != null) {
+                d = new Timestamp( page.getLastModified().getTime());
+            } else {
+                d = new Timestamp( System.currentTimeMillis() );
+            }
             psPage.setTimestamp( 1, d );
             psPage.setString( 2, page.getAuthor() );
             psPage.setInt( 3, version );
@@ -651,7 +609,7 @@ GO
 
     public String getProviderInfo()
     {
-        return "JDBC/MySQL page provider";
+        return "JDBC page provider";
     }
 
     public void deleteVersion( String pageName, int version ) throws ProviderException {
@@ -815,6 +773,7 @@ GO
         }
         try
         {
+            m_migrating = true; 
             importProvider.initialize( engine, importProps );
 
             Collection pages = importProvider.getAllPages();
@@ -831,13 +790,13 @@ GO
                         done = true;
                     else
                     {
-                        //debug( "importing page " + page );
                         String text = importProvider.getPageText( page.getName(), version );
                         putPageText( page, text );
                         if (page.getVersion() >= latest.getVersion())
                             done = true;
                         version += 1;
                     }
+                    info("Migrated page: "+page);
                 }
             }
         }
@@ -848,6 +807,8 @@ GO
         catch( NoRequiredPropertyException e )
         {
             throw new IOException( e.getMessage() );
+        } finally {
+            m_migrating = false;
         }
     }
 

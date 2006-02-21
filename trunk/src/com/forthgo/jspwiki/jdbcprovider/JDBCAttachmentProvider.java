@@ -34,8 +34,10 @@ import java.util.Date;
 
 /*
  * History:
- *   2005-09-28 XG Use jspwiki-s as property prefix for security.
- *   2005-09-07 XG Always use java.util.Date for LastModifield field to friendlier comparisons.
+ *   2006-02-21 SBG When migrating the attachment orignal date is preserved.
+ *                  Database creation code example now to be found in database/
+ *   2005-09-28 XG  Use jspwiki-s as property prefix for security.
+ *   2005-09-07 XG  Always use java.util.Date for LastModifield field to friendlier comparisons.
  */
 
 /**
@@ -47,32 +49,19 @@ import java.util.Date;
  * 
  * @author Thierry Lach
  * @author Xan Gregg
+ * @author Søren Berg Glasius
  * @see JDBCPageProvider
  */
 public class JDBCAttachmentProvider extends JDBCBaseProvider
         implements WikiAttachmentProvider
 {
 
-/* MySQLtable creation commands:
-CREATE TABLE WIKI_ATT
-    (
-        ATT_PAGENAME      VARCHAR (100)  NOT NULL,
-        ATT_FILENAME      VARCHAR (100)  NOT NULL,
-        ATT_VERSION       INTEGER        NOT NULL,
-        ATT_MODIFIED      DATETIME,
-        ATT_MODIFIED_BY   VARCHAR (50),
-        ATT_DATA          MEDIUMBLOB,
-        PRIMARY KEY (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION),
-        UNIQUE (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION),
-        INDEX ATT_MODIFIED_IX (ATT_MODIFIED)
-    );
-*/
 
     protected static final Category log = Category.getInstance( JDBCAttachmentProvider.class );
 
     public String getProviderInfo()
     {
-        return "JDBC/MySQL attachment provider";
+        return "JDBC attachment provider";
     }
 
     public void initialize(WikiEngine engine, Properties properties) throws NoRequiredPropertyException, IOException
@@ -142,15 +131,16 @@ CREATE TABLE WIKI_ATT
             connection = getConnection();
             String sql = getQuery("insert");
             // INSERT INTO WIKI_ATT
-            // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA)
-            // VALUES (?, ?, ?, ?, ?, ?)
+            // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, ATT_LENGTH)
+            // VALUES (?, ?, ?, ?, ?, ?,?)
 
             PreparedStatement psPage = connection.prepareStatement( sql );
             psPage.setString( 1, att.getParentName() );
             psPage.setString( 2, att.getFileName() );
             psPage.setInt( 3, version );
-            Timestamp d;
-            if( att.getLastModified() != null )
+
+           Timestamp d;
+             if( m_migrating && att.getLastModified() != null )
             {
                 d = new Timestamp( att.getLastModified().getTime() );
             }
@@ -158,9 +148,11 @@ CREATE TABLE WIKI_ATT
             {
                 d = new Timestamp( System.currentTimeMillis() );
             }
+           
             psPage.setTimestamp( 4, d );
             psPage.setString( 5, att.getAuthor() );
             psPage.setBytes( 6, data );
+            psPage.setInt( 7, data.length);
             psPage.execute();
             psPage.close();
         }
@@ -223,7 +215,7 @@ CREATE TABLE WIKI_ATT
         {
             connection = getConnection();
             String sql = getQuery("getList");
-            // SELECT LENGTH(ATT_DATA), ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? GROUP BY ATT_FILENAME ORDER BY ATT_VERSION DESC
+            // SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? GROUP BY ATT_FILENAME ORDER BY ATT_VERSION DESC
 
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page.getName() );
@@ -311,7 +303,7 @@ CREATE TABLE WIKI_ATT
         {
             connection = getConnection();
             String sql = getQuery("getInfo");   // latest version is first
-            // SELECT LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
+            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
 
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page.getName() );
@@ -395,7 +387,7 @@ CREATE TABLE WIKI_ATT
         {
             connection = getConnection();
             String sql = getQuery("getVersions");   // latest version is first
-            // SELECT LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
+            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
 
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
@@ -522,7 +514,7 @@ CREATE TABLE WIKI_ATT
         Properties importProps = new Properties();
         importProps.load( new FileInputStream( path ) );
         String classname = importProps.getProperty( AttachmentManager.PROP_PROVIDER );
-
+        
         WikiAttachmentProvider importProvider;
         try
         {
@@ -537,6 +529,7 @@ CREATE TABLE WIKI_ATT
         }
         try
         {
+            m_migrating = true;
             importProvider.initialize( engine, importProps );
 
             List attachments = importProvider.listAllChanged( new Date( 0 ) );
@@ -545,6 +538,7 @@ CREATE TABLE WIKI_ATT
                 Attachment att = ( Attachment ) i.next();
                 InputStream data = importProvider.getAttachmentData( att );
                 putAttachmentData( att, data );
+                info("Migrated Attachment: "+att);
             }
         }
         catch( ProviderException e )
@@ -554,6 +548,8 @@ CREATE TABLE WIKI_ATT
         catch( NoRequiredPropertyException e )
         {
             throw new IOException( e.getMessage() );
+        } finally {
+            m_migrating = false;
         }
     }
 
