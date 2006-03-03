@@ -724,16 +724,16 @@ public class JDBCPageProvider extends JDBCBaseProvider
             String sql = getQuery("renameCurrent");
             // UPDATE WIKI_PAGE SET PAGE_NAME = ? WHERE PAGE_NAME = ?
             PreparedStatement psPage = connection.prepareStatement(sql);
-            psPage.setString(1, from);
-            psPage.setString(2, to);
+            psPage.setString(1, to);
+            psPage.setString(2, from);
             psPage.execute();
             psPage.close();
 
             sql = getQuery("renameVersions");;
-            // UPDATE WIKI_PAGE_VERSIONS SET PAGE_NAME = ? WHERE PAGE_NAME = ?
+            // UPDATE WIKI_PAGE_VERSIONS SET VERSION_NAME = ? WHERE VERSION_NAME = ?
             PreparedStatement psVerPage = connection.prepareStatement(sql);
-            psVerPage.setString(1, from);
-            psVerPage.setString(2, to);
+            psVerPage.setString(1, to);
+            psVerPage.setString(2, from);
             psVerPage.execute();
             psVerPage.close();
         }
