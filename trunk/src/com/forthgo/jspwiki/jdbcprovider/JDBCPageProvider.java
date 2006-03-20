@@ -73,6 +73,9 @@ public class JDBCPageProvider extends JDBCBaseProvider
     {
         debug( "Initializing JDBCPageProvider" );
         super.initialize( engine, properties );
+        
+        
+        
         m_continuationEditTimeout = TextUtil.getIntegerProperty(properties, getPropertyBase() + "continuationEditMinutes", 0);
         m_continuationEditTimeout *= ONE_MINUTE;
         int n = getPageCount();

@@ -52,8 +52,7 @@ import java.util.Properties;
  * a connection pool.
  *
  */
-public abstract class JDBCBaseProvider
-{
+public abstract class JDBCBaseProvider {
 
     private Connection m_sharedConnection = null;
     private CoreConnectionPool m_connectionPool = null;
@@ -91,11 +90,15 @@ public abstract class JDBCBaseProvider
      * @throws java.io.IOException           In case the specified page directory is a file, not a directory.
      */
     public void initialize(WikiEngine engine, Properties properties)
-            throws NoRequiredPropertyException,
-            IOException
-    {
+    throws NoRequiredPropertyException,
+            IOException {
         m_engine = engine;
+
+
+
+
         m_username = getRequired( properties, PROP_USERNAME );
+
         m_password = getRequired( properties, PROP_PASSWORD );
         m_driver = getRequired( properties, PROP_DRIVER );
         m_url = getRequired( properties, PROP_URL );
@@ -109,8 +112,7 @@ public abstract class JDBCBaseProvider
 
         m_sharedConnection = null;
         m_connectionPool = null;
-        try
-        {
+        try {
             if( m_cachedConnections == 0 )
                 ;// do nothing
             else if( m_cachedConnections == 1 )
@@ -129,9 +131,7 @@ public abstract class JDBCBaseProvider
                     break;
                 checkQuery(query);
             }
-        }
-        catch( SQLException e )
-        {
+        } catch( SQLException e ) {
             throw new IOException( "SQL Exception: " + e.getMessage() );
         }
     }
@@ -156,7 +156,7 @@ public abstract class JDBCBaseProvider
     }
 
     private String getRequired(Properties properties, String name)
-            throws NoRequiredPropertyException {
+    throws NoRequiredPropertyException {
         return WikiEngine.getRequiredProperty(properties, getPropertyBase() + name);
     }
 
@@ -166,142 +166,104 @@ public abstract class JDBCBaseProvider
 
     /**
      * Returns a string to use as a prefix for property names.
-     * 
+     *
      * @return property name prefix
      */
     protected abstract String getPropertyBase();
 
     public abstract Category getLog();
 
-    protected void debug( String message )
-    {
+    protected void debug( String message ) {
         getLog().debug( message );
     }
 
-    protected void info( String message )
-    {
+    protected void info( String message ) {
         getLog().info( message );
     }
 
-    protected void error( String message, Throwable t )
-    {
+    protected void error( String message, Throwable t ) {
         getLog().error( message, t );
     }
 
-    private void createConnectionPool() throws SQLException
-    {
-        try
-        {
+    private void createConnectionPool() throws SQLException {
+        try {
             m_connectionPool = new CoreConnectionPool(
                     m_driver, m_url, m_username, m_password,
                     m_cachedConnections, m_cachedConnections * 4, true );
-        }
-        catch( SQLException e )
-        {
+        } catch( SQLException e ) {
             error( "Unable to get database connection pool: " + m_url, e );
             throw e;
         }
     }
 
-    private void createSharedConnection() throws SQLException
-    {
-        try
-        {
+    private void createSharedConnection() throws SQLException {
+        try {
             m_sharedConnection = DriverManager.getConnection( m_url, m_username, m_password );
-        }
-        catch( SQLException e )
-        {
+        } catch( SQLException e ) {
             error( "Unable to get database connection: " + m_url, e );
             throw e;
         }
     }
 
-    private void checkDriver() throws IOException
-    {
-        try
-        {
+    private void checkDriver() throws IOException {
+        try {
             Class.forName( m_driver );
-        }
-        catch( ClassNotFoundException e )
-        {
+        } catch( ClassNotFoundException e ) {
             throw new IOException( "Unable to find database driver: " + m_driver );
         }
     }
 
-    private void checkConnection() throws SQLException
-    {
+    private void checkConnection() throws SQLException {
         Connection connection = null;
-        try
-        {
+        try {
             connection = getConnection();
-        }
-        catch( SQLException e )
-        {
+        } catch( SQLException e ) {
             error( "Unable to get database connection: " + m_url, e );
             throw e;
-        }
-        finally
-        {
+        } finally {
             releaseConnection( connection );
         }
     }
 
-    public boolean isConnectionOK(Connection connection)
-    {
-		try {
-			String sql = getQuery("checkConnection");
-			Statement stmt = connection.createStatement();
-			ResultSet rs = stmt.executeQuery(sql);
-			rs.close();
-			stmt.close();
-		}
-		catch (SQLException se) {
-			return false;
-		}
-		return true;
+    public boolean isConnectionOK(Connection connection) {
+        try {
+            String sql = getQuery("checkConnection");
+            Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            rs.close();
+            stmt.close();
+        } catch (SQLException se) {
+            return false;
+        }
+        return true;
     }
 
     // public instead of protected by user request
-    public Connection getConnection() throws SQLException
-    {
+    public Connection getConnection() throws SQLException {
 //        showMemory("getConnection");
-        if( m_sharedConnection != null )
-        {
+        if( m_sharedConnection != null ) {
             if( !isConnectionOK(m_sharedConnection) )
                 createSharedConnection();
             return m_sharedConnection;
-        }
-        else if( m_connectionPool != null )
-        {
+        } else if( m_connectionPool != null ) {
             return m_connectionPool.getConnection(this);
-        }
-        else
-        {
+        } else {
             return DriverManager.getConnection( m_url, m_username, m_password );
         }
     }
 
     // public instead of protected by user request
-    public void releaseConnection( Connection connection )
-    {
+    public void releaseConnection( Connection connection ) {
         if( connection == null )
             return; // happens if we are called in a finally clause of a failed getConnection
-        if( m_sharedConnection != null )
-        {
+        if( m_sharedConnection != null ) {
             // do nothing, shared connection is kept alive
-        }
-        else if( m_connectionPool != null )
-        {
+        } else if( m_connectionPool != null ) {
             m_connectionPool.free( connection );
-        }
-        else
-        {
-            try
-            {
+        } else {
+            try {
                 connection.close();
-            }
-            catch( SQLException e )
-            {
+            } catch( SQLException e ) {
                 error( "connection failed to close", e );
             }
         }
@@ -310,28 +272,22 @@ public abstract class JDBCBaseProvider
 
     /**
      * Checks that a query runs without error.
-     * 
+     *
      * @param query the sql query
      * @throws SQLException if the query fails
      */
-    protected void checkQuery( String query ) throws SQLException
-    {
+    protected void checkQuery( String query ) throws SQLException {
         Connection connection = null;
-        try
-        {
+        try {
             connection = getConnection();
             Statement stmt = connection.createStatement();
             ResultSet rs = stmt.executeQuery( query );
             rs.close();
             stmt.close();
-        }
-        catch( SQLException se )
-        {
+        } catch( SQLException se ) {
             error( "Check failed: " + query, se );
             throw se;
-        }
-        finally
-        {
+        } finally {
             releaseConnection( connection );
         }
     }
