@@ -33,6 +33,8 @@ import java.util.Date;
 
 /*
  * History:
+ *   2006-03-26 XG  Fix a bug reported by Andreas Kohlbecker where the versions
+ *                  table was not getting updated during a continuation edit
  *   2006-02-21 SBG When migrating the page orignal date is preserved. 
  *                  Database creation code example now to be found in database/
  *   2006-02-12 XG  Move all SQL statements into property file.
