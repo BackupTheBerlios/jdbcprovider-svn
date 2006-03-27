@@ -94,7 +94,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
                 "insertCurrent", "insertVersion", "getCurrentInfo", "getVersionInfo",
                 "updateCurrent", "getAllPages", "getAllPagesSince", "getPageCount",
                 "getVersions", "deleteCurrent", "deleteVersion", "deleteVersions",
-                "renameCurrent", "renameVersions"};
+                "renameCurrent", "renameVersions", "updateVersion"};
     }
 
     public Category getLog()
@@ -316,6 +316,16 @@ public class JDBCPageProvider extends JDBCBaseProvider
                 psVer.setTimestamp( 3, d );
                 psVer.setString( 4, page.getAuthor() );
                 psVer.setString( 5, text );
+                psVer.execute();
+                psVer.close();
+            } else {
+                // UPDATE WIKI_PAGE_VERSIONS  SET VERSION_MODIFIED=?, VERSION_MODIFIED_BY=?, VERSION_TEXT=? WHERE VERSION_NAME =?, VERSION_NUM=?
+                PreparedStatement psVer = connection.prepareStatement(sql);
+                psVer.setTimestamp(1, d);
+                psVer.setString(2, page.getAuthor());
+                psVer.setString(3, text);
+                psVer.setString(4, page.getName());
+                psVer.setInt(5, version);
                 psVer.execute();
                 psVer.close();
             }
