@@ -488,8 +488,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             // UPDATE WIKI_ATT SET ATT_PAGE_NAME = ? WHERE ATT_PAGE_NAME = ?
 
             PreparedStatement ps = connection.prepareStatement(sql);
-            ps.setString(1, oldParent);
-            ps.setString(2, newParent);
+            ps.setString(1, newParent);
+            ps.setString(2, oldParent);
             ps.execute();
             ps.close();
         }
