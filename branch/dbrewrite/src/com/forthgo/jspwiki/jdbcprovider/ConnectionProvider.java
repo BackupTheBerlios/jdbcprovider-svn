@@ -3,19 +3,31 @@
  *
  * Created on 20. marts 2006, 15:15
  *
- * To change this template, choose Tools | Template Manager
- * and open the template in the editor.
  */
 
 package com.forthgo.jspwiki.jdbcprovider;
 
-import com.ecyrd.jspwiki.WikiException;
+import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Properties;
 
 /**
  *
  * @author glasius
  */
-public interface ConnectionProvider {
-    public Connection getConnection() throws WikiException;
+public abstract class ConnectionProvider {
+    public abstract void initialize(Properties wikiProps) throws NoRequiredPropertyException;
+    
+    public abstract Connection getConnection() throws SQLException;
+    
+    public void releaseConnection(Connection connection)  {
+        try {
+            if(connection != null) {
+                connection.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
 }

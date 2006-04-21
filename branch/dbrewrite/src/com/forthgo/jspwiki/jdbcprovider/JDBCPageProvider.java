@@ -19,17 +19,34 @@
  */
 package com.forthgo.jspwiki.jdbcprovider;
 
-import com.ecyrd.jspwiki.*;
+import com.ecyrd.jspwiki.NoRequiredPropertyException;
+import com.ecyrd.jspwiki.PageManager;
+import com.ecyrd.jspwiki.QueryItem;
+import com.ecyrd.jspwiki.SearchMatcher;
+import com.ecyrd.jspwiki.SearchResult;
+import com.ecyrd.jspwiki.SearchResultComparator;
+import com.ecyrd.jspwiki.WikiEngine;
+import com.ecyrd.jspwiki.WikiPage;
 import com.ecyrd.jspwiki.providers.ProviderException;
 import com.ecyrd.jspwiki.providers.WikiPageProvider;
 import com.ecyrd.jspwiki.util.ClassUtil;
-import org.apache.log4j.Category;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Properties;
+import java.util.TreeSet;
+import org.apache.log4j.Category;
 
 /*
  * History:
@@ -63,45 +80,18 @@ import java.util.Date;
  * @author Xan Gregg
  * @author Søren Berg Glasius
  */
-public class JDBCPageProvider extends JDBCBaseProvider
-        implements WikiPageProvider
-{
+public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvider {
 
     protected static final Category log = Category.getInstance( JDBCPageProvider.class );
-    protected static final int ONE_MINUTE = 60 * 1000;    // in milliseconds
-    protected int m_continuationEditTimeout = 60 * ONE_MINUTE;    // one hour in milliseconds
 
     public void initialize(WikiEngine engine, Properties properties) throws NoRequiredPropertyException, IOException
     {
         debug( "Initializing JDBCPageProvider" );
         super.initialize( engine, properties );
-        
-        
-        
-        m_continuationEditTimeout = TextUtil.getIntegerProperty(properties, getPropertyBase() + "continuationEditMinutes", 0);
-        m_continuationEditTimeout *= ONE_MINUTE;
-        int n = getPageCount();
-        String migrationPath = properties.getProperty( getPropertyBase() + "migrateFrom" );
-        if( n == 0 && migrationPath != null )
-            migratePages( engine, migrationPath );
-    }
-
-    protected String getPropertyBase()
-    {
-        return "jspwiki-s.JDBCPageProvider.";   // -s prevents display as a wiki variable, for security
-    }
-
-    protected String[] getQueryKeys() {
-        return new String[]{"pageExists", "getCurrent", "getVersion",
-                "insertCurrent", "insertVersion", "getCurrentInfo", "getVersionInfo",
-                "updateCurrent", "getAllPages", "getAllPagesSince", "getPageCount",
-                "getVersions", "deleteCurrent", "deleteVersion", "deleteVersions",
-                "renameCurrent", "renameVersions", "updateVersion"};
-    }
-
-    public Category getLog()
-    {
-        return log;
+        int count = getPageCount();
+        log.debug("Page count at startup: "+count);
+        if( count == 0 && getConfig().hasDesireToMigrate())
+            migratePages( engine);
     }
 
     public boolean pageExists( String page )
@@ -112,7 +102,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         {
             connection = getConnection();
             // SELECT PAGE_VERSION FROM WIKI_PAGE WHERE PAGE_NAME = ?
-            String sql = getQuery("pageExists");
+            String sql = getSQL("pageExists");
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page );
             ResultSet rs = ps.executeQuery();
@@ -144,7 +134,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getCurrent");
+            String sql = getSQL("getCurrent");
             // SELECT PAGE_TEXT FROM WIKI_PAGE WHERE PAGE_NAME = ?
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page );
@@ -188,7 +178,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getVersion");
+            String sql = getSQL("getVersion");
             // SELECT VERSION_TEXT FROM WIKI_PAGE_VERSIONS WHERE VERSION_NAME = ? AND VERSION_NUM = ?
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page );
@@ -226,7 +216,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("insertCurrent");
+            String sql = getSQL("insertCurrent");
             // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
             PreparedStatement psPage = connection.prepareStatement( sql );
             psPage.setString( 1, page.getName() );
@@ -243,7 +233,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
             psPage.execute();
             psPage.close();
 
-            sql = getQuery("insertVersion");
+            sql = getSQL("insertVersion");
             // INSERT INTO WIKI_PAGE_VERSIONS (VERSION_NAME, VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY, VERSION_TEXT) VALUES (?, ?, ?, ?, ?)
             PreparedStatement psVer = connection.prepareStatement( sql );
             psVer.setString( 1, page.getName() );
@@ -270,7 +260,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getCurrentInfo");
+            String sql = getSQL("getCurrentInfo");
             // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE WHERE PAGE_NAME = ?
             PreparedStatement psQuery = connection.prepareStatement(sql);
             psQuery.setString(1, page.getName());
@@ -285,13 +275,13 @@ public class JDBCPageProvider extends JDBCBaseProvider
             /* If same author and saved again within m_continuationEditTimeout, save by directly overwriting,
                i.e. keep version number and do not create a backup */
             boolean isDifferentAuthor = page.getAuthor() == null || page.getAuthor().equals("") || !page.getAuthor().equals(previousAuthor);
-            boolean isContinuationEditTimeExpired = System.currentTimeMillis() > m_continuationEditTimeout + previousModified.getTime();
+            boolean isContinuationEditTimeExpired = System.currentTimeMillis() > getConfig().getContinuationEditTimeout() + previousModified.getTime();
             boolean createVersion = isDifferentAuthor || isContinuationEditTimeExpired;
 
             if (createVersion)
                 version += 1;
 
-            sql = getQuery("updateCurrent");
+            sql = getSQL("updateCurrent");
             // UPDATE WIKI_PAGE SET PAGE_MODIFIED = ?, PAGE_MODIFIED_BY = ?, PAGE_VERSION = ?, PAGE_TEXT = ? WHERE PAGE_NAME = ?
 
             PreparedStatement psPage = connection.prepareStatement( sql );
@@ -310,7 +300,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
             psPage.close();
 
             if (createVersion) {
-                sql = getQuery("insertVersion");
+                sql = getSQL("insertVersion");
                 // INSERT INTO WIKI_PAGE_VERSIONS (VERSION_NAME, VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY, VERSION_TEXT) VALUES (?, ?, ?, ?, ?)
                 PreparedStatement psVer = connection.prepareStatement( sql );
                 psVer.setString( 1, page.getName() );
@@ -363,7 +353,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getAllPages");
+            String sql = getSQL("getAllPages");
             // SELECT PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE
             PreparedStatement ps = connection.prepareStatement( sql );
             ResultSet rs = ps.executeQuery();
@@ -399,7 +389,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getAllPagesSince");
+            String sql = getSQL("getAllPagesSince");
             // SELECT PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE WHERE PAGE_MODIFIED > ?
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setTimestamp( 1, new Timestamp( date.getTime() ) );
@@ -436,7 +426,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getPageCount");
+            String sql = getSQL("getPageCount");
             // SELECT COUNT(*) FROM WIKI_PAGE
             Statement stmt = connection.createStatement();
             ResultSet rs = stmt.executeQuery( sql );
@@ -505,7 +495,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getCurrentInfo");
+            String sql = getSQL("getCurrentInfo");
             // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE WHERE PAGE_NAME = ?
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page );
@@ -550,7 +540,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
             try
             {
                 connection = getConnection();
-                String sql = getQuery("getVersionInfo");
+                String sql = getSQL("getVersionInfo");
                 // SELECT VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY FROM WIKI_PAGE_VERSIONS WHERE VERSION_NAME = ? AND VERSION_NUM = ?
                 PreparedStatement ps = connection.prepareStatement( sql );
                 ps.setString( 1, page );
@@ -593,7 +583,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("getVersions");
+            String sql = getSQL("getVersions");
             // SELECT VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY FROM WIKI_PAGE_VERSIONS WHERE VERSION_NAME = ? ORDER BY VERSION_NUM DESC
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page );
@@ -647,7 +637,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
             Connection connection = null;
             try {
                 connection = getConnection();
-                String sql = getQuery("updateCurrent");
+                String sql = getSQL("updateCurrent");
                 // UPDATE WIKI_PAGE SET PAGE_MODIFIED = ? PAGE_MODIFIED_BY = ? PAGE_VERSION = ? PAGE_TEXT = ? WHERE PAGE_NAME = ?
 
                 PreparedStatement psPage = connection.prepareStatement(sql);
@@ -673,7 +663,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("deleteVersion");
+            String sql = getSQL("deleteVersion");
             // DELETE FROM WIKI_PAGE_VERSIONS WHERE VERSION_NAME = ? AND VERSION_NUM = ?
             PreparedStatement psVer = connection.prepareStatement( sql );
             psVer.setString( 1, pageName );
@@ -698,14 +688,14 @@ public class JDBCPageProvider extends JDBCBaseProvider
         try
         {
             connection = getConnection();
-            String sql = getQuery("deleteVersions");
+            String sql = getSQL("deleteVersions");
             // DELETE FROM WIKI_PAGE_VERSIONS WHERE VERSION_NAME = ?
             PreparedStatement psVer = connection.prepareStatement( sql );
             psVer.setString( 1, pageName );
             psVer.execute();
             psVer.close();
 
-            sql = getQuery("deleteCurrent");
+            sql = getSQL("deleteCurrent");
             // DELETE FROM WIKI_PAGE WHERE PAGE_NAME = ?
             PreparedStatement psPage = connection.prepareStatement( sql );
             psPage.setString( 1, pageName );
@@ -736,7 +726,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
         Connection connection = null;
         try {
             connection = getConnection();
-            String sql = getQuery("renameCurrent");
+            String sql = getSQL("renameCurrent");
             // UPDATE WIKI_PAGE SET PAGE_NAME = ? WHERE PAGE_NAME = ?
             PreparedStatement psPage = connection.prepareStatement(sql);
             psPage.setString(1, to);
@@ -744,7 +734,7 @@ public class JDBCPageProvider extends JDBCBaseProvider
             psPage.execute();
             psPage.close();
 
-            sql = getQuery("renameVersions");;
+            sql = getSQL("renameVersions");;
             // UPDATE WIKI_PAGE_VERSIONS SET VERSION_NAME = ? WHERE VERSION_NAME = ?
             PreparedStatement psVerPage = connection.prepareStatement(sql);
             psVerPage.setString(1, to);
@@ -767,11 +757,12 @@ public class JDBCPageProvider extends JDBCBaseProvider
      * "import" provider is specified by the properties file at
      * the given path.
      */
-    private void migratePages( WikiEngine engine, String path )
+    private void migratePages( WikiEngine engine)
             throws IOException
     {
         Properties importProps = new Properties();
-        importProps.load( new FileInputStream( path ) );
+        log.info("Migrating pages from: "+getConfig().getMigrateFrom());
+        importProps.load( new FileInputStream( getConfig().getMigrateFrom()) );
         String classname = importProps.getProperty( PageManager.PROP_PAGEPROVIDER );
 
         WikiPageProvider importProvider;
@@ -825,6 +816,14 @@ public class JDBCPageProvider extends JDBCBaseProvider
         } finally {
             m_migrating = false;
         }
+    }
+
+    public Category getLog() {
+        return log;
+    }
+
+    public String getSQL(String key) {
+        return super.getSQL("page."+key);
     }
 
 

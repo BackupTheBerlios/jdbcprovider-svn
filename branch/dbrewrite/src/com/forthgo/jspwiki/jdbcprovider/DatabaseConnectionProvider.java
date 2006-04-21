@@ -9,9 +9,9 @@
 
 package com.forthgo.jspwiki.jdbcprovider;
 
+import com.ecyrd.jspwiki.InternalWikiException;
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.WikiEngine;
-import com.ecyrd.jspwiki.WikiException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -21,14 +21,17 @@ import java.util.Properties;
  *
  * @author glasius
  */
-public class DatabaseConnectionProvider implements ConnectionProvider {
-
+public class DatabaseConnectionProvider extends ConnectionProvider {
+    
     private String url;
     private String username;
     private String password;
     
     /** Creates a new instance of DatabaseConnectionProvider */
-    public DatabaseConnectionProvider(Properties config) throws NoRequiredPropertyException, WikiException {
+    public DatabaseConnectionProvider() {
+    }
+
+    public void initialize(final Properties config) throws NoRequiredPropertyException {
         String driver = WikiEngine.getRequiredProperty(config, "jdbc.driverClassName");
         url = WikiEngine.getRequiredProperty(config, "jdbc.url");
         username = WikiEngine.getRequiredProperty(config, "jdbc.username");
@@ -36,15 +39,12 @@ public class DatabaseConnectionProvider implements ConnectionProvider {
         try {
             Class.forName(driver);
         } catch (ClassNotFoundException ex) {
-            throw new WikiException("Database driver could not load. Class not found. Find driver for: "+driver);
+            throw new InternalWikiException("Database driver could not load. Class not found. Find driver for: "+driver);
         }
     }
-
-    public Connection getConnection() throws WikiException {
-        try {
-            return DriverManager.getConnection( url, username, password );
-        } catch (SQLException ex) {
-            throw new WikiException(ex.getMessage());
-        }
+    
+    public Connection getConnection() throws SQLException {
+        return DriverManager.getConnection( url, username, password );
     }
+    
 }
