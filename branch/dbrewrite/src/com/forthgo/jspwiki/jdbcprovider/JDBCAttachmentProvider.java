@@ -34,7 +34,7 @@ import java.util.Date;
 
 /*
  * History:
- *   2006-04-24 MTR listAttachments now gets latest attachments in stead of only
+ *   2006-04-24 MT  listAttachments now gets latest attachments in stead of only
  *                  version 1. database/*.attachments.properties:
  *                  jspwiki-s.JDBCAttachmentProvider.getList changed accordingly.
  *   2006-02-21 SBG When migrating the attachment orignal date is preserved.
@@ -50,7 +50,7 @@ import java.util.Date;
  * Based on Thierry Lach's DatabaseProvider, which supported Wiki pages
  * but not attachments.
  *
- * @authoe Mikkel Troest
+ * @author Mikkel Troest
  * @author Thierry Lach
  * @author Xan Gregg
  * @author Søren Berg Glasius
