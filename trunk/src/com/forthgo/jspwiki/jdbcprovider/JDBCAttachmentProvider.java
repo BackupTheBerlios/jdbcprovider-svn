@@ -168,6 +168,10 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
 
     public InputStream getAttachmentData( Attachment att ) throws ProviderException, IOException
     {
+        int version = att.getVersion();
+        if (version == LATEST_VERSION)
+            version = findLatestVersion(att);
+
         InputStream result = null;
         Connection connection = null;
         try
@@ -179,7 +183,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
-            ps.setInt( 3, att.getVersion() );
+            ps.setInt( 3, version );
             ResultSet rs = ps.executeQuery();
 
             if( rs.next() )
@@ -235,6 +239,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 att.setAuthor( rs.getString( 4 ) );
                 att.setVersion( rs.getInt( 5 ) );
                 result.add( att );
+                previousFileName = fileName.toString();
             }
             rs.close();
             ps.close();
@@ -299,6 +304,9 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     public Attachment getAttachmentInfo( WikiPage page, String name, int version ) throws ProviderException
     {
         Connection connection = null;
+        if (version == LATEST_VERSION)
+            version = findLatestVersion(page.getName(), name);
+
         try
         {
             connection = getConnection();
@@ -349,6 +357,10 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
      */
     private int findLatestVersion( Attachment att )
     {
+        return findLatestVersion(att.getParentName(), att.getFileName());
+    }
+
+    private int findLatestVersion(String pageName, String fileName) {
         int version = 0;
         Connection connection = null;
         try
@@ -358,8 +370,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             // SELECT ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC LIMIT 1
 
             PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
+            ps.setString( 1, pageName );
+            ps.setString( 2, fileName );
             ResultSet rs = ps.executeQuery();
 
             if( rs.next() )
@@ -370,7 +382,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         }
         catch( SQLException se )
         {
-            error( "Error trying to find latest attachment: " + att, se );
+            error( "Error trying to find latest attachment: " + pageName + "/" + fileName, se );
         }
         finally
         {
