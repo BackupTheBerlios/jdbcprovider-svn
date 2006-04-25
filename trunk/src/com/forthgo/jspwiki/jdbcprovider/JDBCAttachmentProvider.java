@@ -219,7 +219,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         {
             connection = getConnection();
             String sql = getQuery("getList");
-            // SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? GROUP BY ATT_FILENAME ORDER BY ATT_VERSION DESC
+            // SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? ORDER BY ATT_FILENAME, ATT_VERSION DESC
 
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, page.getName() );
