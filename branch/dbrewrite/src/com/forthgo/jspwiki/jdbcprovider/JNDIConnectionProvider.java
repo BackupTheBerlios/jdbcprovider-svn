@@ -21,8 +21,14 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 
+/*
+ * History:
+ *   2006-04-26 MT  Fixed initialize() to use jndi.datasource in stead of hard-
+ *                  coded test data source
+ */
+
 /**
- *
+ * @author Mikkel Troest
  * @author glasius
  */
 public class JNDIConnectionProvider extends ConnectionProvider {
@@ -43,7 +49,7 @@ public class JNDIConnectionProvider extends ConnectionProvider {
                 throw new InternalWikiException("Ouch - no initial context");
             }
             
-            ds =(DataSource)ctx.lookup("java:comp/env/jdbc/TestDB");
+            ds =(DataSource)ctx.lookup("java:comp/env/" + jndiDatasource);
         } catch (NamingException ex) {
             throw new InternalWikiException("NamingException caught: "+ex.getMessage());
         }

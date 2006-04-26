@@ -21,8 +21,22 @@ import java.util.Properties;
 import org.apache.commons.jocl.ConstructorUtil;
 import org.apache.log4j.Category;
 
+/*
+ * History:
+ *   2006-04-26 MT  Added WikiEngine member and changed constructor declaration
+ *                  to JDBCProviderConfiguration( WikiEngine, String).
+ *                  This was necessary to be able to access the getRootPath()
+ *                  method of the WikiEngine.
+ *                  Changed the loadProperties() method to use java.io.File and
+ *                  java.io.FileInputStream to load properties;
+ *                  Class.getResource() do not work properly when classes are
+ *                  packed inside a jar file. Also, the root path is seen as
+ *                  '${CATALINA_HOME}/bin', so prepending '/WEB-INF/' didn't help.
+ */
+
 /**
  *
+ * @author Mikkel Troest
  * @author glasius
  */
 public class JDBCProviderConfiguration {
@@ -31,12 +45,13 @@ public class JDBCProviderConfiguration {
     
     private Properties config ;
     private Properties sql;
+    private WikiEngine m_wikiEngine;
     
     private ConnectionProvider connectionProvider;
     
     /** Creates a new instance of JDBCProviderConfiguration */
-    public JDBCProviderConfiguration(String configPath) throws IOException, NoRequiredPropertyException {
-        
+    public JDBCProviderConfiguration(WikiEngine engine, String configPath) throws IOException, NoRequiredPropertyException {
+        m_wikiEngine = engine;
         String pageProperties[] = new String[] {"pageExists", "getCurrent", "getVersion",
         "insertCurrent", "insertVersion", "getCurrentInfo", "getVersionInfo",
         "updateCurrent", "getAllPages", "getAllPagesSince", "getPageCount",
@@ -111,12 +126,18 @@ public class JDBCProviderConfiguration {
     
     private Properties loadProperties(String path) throws IOException {
         Properties p = new Properties();
-        if(getClass().getResource(path) == null) {
-            path = "/WEB-INF/"+path;
+        java.io.File f = new java.io.File(path);
+        if(!f.exists()) {
+           log.info("Properties not found in '" + f.getAbsoluteFile() + "'. Looking in <JSPWiki_APP_BASE>/WEB-INF/...");
+           path = m_wikiEngine.getRootPath() + "WEB-INF" + System.getProperty("file.separator") + path; 
+           f = new java.io.File(path);
         }
-        if(getClass().getResource(path) != null) {
-            p.load(getClass().getResourceAsStream(path));
-        } else {
+        if(f.exists()) {
+            java.io.FileInputStream fis = new java.io.FileInputStream(f);
+            p.load(fis);
+            fis.close();
+        }
+        else {
             throw new IOException("JDBCProvider configuration not found: "+path);
         }
         return p;

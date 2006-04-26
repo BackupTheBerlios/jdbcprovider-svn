@@ -33,6 +33,10 @@ import java.util.Properties;
 
 /*
  * History:
+ *   2006-04-26 MT Changed property name: 'jspwiki.pageProvider.configuration'
+ *                 to 'jspwiki.jdbcprovider.configuration'
+ *                 Changed instantiation of JDBCProviderConfiguration to include
+ *                 WikiEngine (See ProviderConfiguration)
  *   2006-02-12 XG Move all SQL statements into property file.
  *                 Expand implementation of Delete.
  *   2006-01-29 XG Update for JSPWiki 2.3.72 (with help from Terry Steichen)
@@ -74,9 +78,9 @@ public abstract class JDBCBaseProvider implements WikiProvider {
         m_engine = engine;
         
         if(config == null) {
-            String configPath = WikiEngine.getRequiredProperty(properties,"jspwiki.pageProvider.configuration");
+            String configPath = WikiEngine.getRequiredProperty(properties,"jspwiki.jdbcprovider.configuration");
             debug("configPath: "+configPath);
-            config = new JDBCProviderConfiguration(configPath);
+            config = new JDBCProviderConfiguration(m_engine, configPath);
         }
     }
     

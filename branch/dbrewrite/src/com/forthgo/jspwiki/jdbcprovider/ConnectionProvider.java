@@ -12,8 +12,15 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
 
+/*
+ * History:
+ *   2006-04-26 MT  Added connection = null to releaseConnection() to make sure
+ *                  the connection is not accidentially closed again while being
+ *                  re-used from the pool.
+ */
+
 /**
- *
+ * @author Mikkel Troest
  * @author glasius
  */
 public abstract class ConnectionProvider {
@@ -25,6 +32,7 @@ public abstract class ConnectionProvider {
         try {
             if(connection != null) {
                 connection.close();
+                connection = null;
             }
         } catch (SQLException ex) {
             ex.printStackTrace();
