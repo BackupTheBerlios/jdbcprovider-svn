@@ -1,7 +1,8 @@
 /*
-    JSPWiki - a JSP-based WikiWiki clone.
+    JDBCProvider - a JDBC-based page provider for JSPWiki.
 
-    Copyright (C) 2004-2005 Xan Gregg (xan.gregg@forthgo.com)
+    Copyright (C) 2004-2006 JDBCProvider team at berlios
+    http://developer.berlios.de/projects/jdbcprovider/
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by

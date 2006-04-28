@@ -1,7 +1,8 @@
 /* 
-    JSPWiki - a JSP-based WikiWiki clone.
+    JDBCProvider - a JDBC-based page provider for JSPWiki.
 
-    Copyright (C) 2004-2005 Xan Gregg (xan.gregg@forthgo.com)
+    Copyright (C) 2004-2006 JDBCProvider team at berlios
+    http://developer.berlios.de/projects/jdbcprovider/
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -34,8 +35,9 @@ import java.util.Date;
 
 /*
  * History:
+ *   2006-04-24 XG  Fix SQL listAttachments.
  *   2006-02-21 SBG When migrating the attachment orignal date is preserved.
- *                  Database creation code example now to be found in database/
+ *                  Database creation code example now to be found in database directory.
  *   2005-09-28 XG  Use jspwiki-s as property prefix for security.
  *   2005-09-07 XG  Always use java.util.Date for LastModifield field to friendlier comparisons.
  */
