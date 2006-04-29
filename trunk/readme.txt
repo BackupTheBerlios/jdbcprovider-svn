@@ -1,6 +1,7 @@
     JDBCProvider - a JDBC-based page provider for JSPWiki.
 
     Copyright (C) 2004-2006 JDBCProvider team at berlios.de
+    http://jdbcprovider.berlios.de/
     http://developer.berlios.de/projects/jdbcprovider/
     http://www.jspwiki.org/wiki/JDBCProviders
 
