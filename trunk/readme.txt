@@ -4,15 +4,21 @@
     http://developer.berlios.de/projects/jdbcprovider/
     http://www.jspwiki.org/wiki/JDBCProviders
 
+SUMMARY
+
+JSPWiki has a pluggable content provider system. This package supplies
+providers for page and attachment content backed by a SQL database.
+
 STATUS
 
 Released 2006-04-29
 Tested with JSPWiki 2.3.100
 
-NOTES
+RECENT CHANGES
 
-JSPWiki has a pluggable content provider system. This package supplies
-providers for page and attachment content backed by a SQL database.
+All SQL code has been pulled out into separate properties files for easier
+adaption to other databases. Attachment provider bugs related to
+moving and listing have been fixed.
 
 INSTALL
 
@@ -34,7 +40,7 @@ jspwiki.pageProvider = com.forthgo.jspwiki.jdbcprovider.JDBCPageProvider
 #
 #  Determines the database information when using JDBCPageProvider.
 #
-jspwiki-s.JDBCPageProvider.url = jdbc:mysql://localhost:3306/jspwiki
+jspwiki-s.JDBCPageProvider.url = jdbc:mysql://localhost:3306/jspwikidb
 jspwiki-s.JDBCPageProvider.username = jspwikiuser
 jspwiki-s.JDBCPageProvider.password = jspwikipass
 jspwiki-s.JDBCPageProvider.driver = org.gjt.mm.mysql.Driver
@@ -49,7 +55,7 @@ jspwiki.attachmentProvider = com.forthgo.jspwiki.jdbcprovider.JDBCAttachmentProv
 #  Determines the database information when using JDBCAttachmentProvider.
 #  Can be the same url as for JDBCPageProvider.
 #
-jspwiki-s.JDBCAttachmentProvider.url = jdbc:mysql://localhost:3306/jspwiki
+jspwiki-s.JDBCAttachmentProvider.url = jdbc:mysql://localhost:3306/jspwikidb
 jspwiki-s.JDBCAttachmentProvider.username = jspwikiuser
 jspwiki-s.JDBCAttachmentProvider.password = jspwikipass
 jspwiki-s.JDBCAttachmentProvider.driver = org.gjt.mm.mysql.Driver
@@ -57,23 +63,16 @@ jspwiki-s.JDBCAttachmentProvider.cachedConnections = 5
 ...
 ...contents of mysql.properties and mysql.attachment.properties...
 
-RECENT CHANGES
-
-All SQL code has been pulled out into separate properties files for easier
-adaption to other databases. Attachment provider bugs related to
-moving and listing have been fixed.
-
 FUTURE PLANS
 
 We are working on reducing the changes need to jspwiki.properties by
-getting the connection info from the servlet container via JNDI, and
+getting the connection info from the servlet container via JNDI and
 leaving the SQL statements in separate properties files.
-
 
 CONTENTS
 
   readme.txt -- this file
-  jdbcprovider.jar -- put this in webapps/jspwiki/WEB-INF/lib
+  jdbcprovider.jar -- put this in webapps/.../WEB-INF/lib
   database/
     create_tables_mssql.sql - MS SQL Server code to create the necessary DB tables
     create_tables_mysql.sql - MySQL Server code to create the necessary DB tables
