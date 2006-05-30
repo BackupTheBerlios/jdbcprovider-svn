@@ -34,6 +34,8 @@ import java.util.Date;
 
 /*
  * History:
+ *   2006-05-30 MT  Added missing check for version == WikiProvider.LATEST_VERSION
+ *                  in getAttachmentData(Attachment att)
  *   2006-04-26 MT  Changed comment for listAttachments() to reflect actual SQL
  *                  statements.
  *   2006-04-24 MT  listAttachments now gets latest attachments in stead of only
@@ -108,6 +110,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         FileUtil.copyContents( dataStream, baos );
         byte data[] = baos.toByteArray();
         int version = findLatestVersion( att ) + 1;
+        //att.setVersion(version);
         Connection connection = null;
         try {
             connection = getConnection();
@@ -142,17 +145,22 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     }
     
     public InputStream getAttachmentData( Attachment att ) throws ProviderException, IOException {
-        InputStream result = null;
+        
+        int version = att.getVersion();
+        if( version == WikiProvider.LATEST_VERSION )
+            version = findLatestVersion( att );
+        
+    InputStream result = null;
         Connection connection = null;
         try {
             connection = getConnection();
             String sql = getSQL("getData");
             // SELECT ATT_DATA FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
-            
+
             PreparedStatement ps = connection.prepareStatement( sql );
             ps.setString( 1, att.getParentName() );
             ps.setString( 2, att.getFileName() );
-            ps.setInt( 3, att.getVersion() );
+            ps.setInt( 3, version );
             ResultSet rs = ps.executeQuery();
             
             if( rs.next() ) {
