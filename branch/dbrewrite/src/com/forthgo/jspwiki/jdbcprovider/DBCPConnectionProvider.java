@@ -53,12 +53,13 @@ public class DBCPConnectionProvider extends ConnectionProvider {
         GenericObjectPool connectionPool = new GenericObjectPool(null);
         ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
         PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
-        PoolingDriver driver;
+        PoolingDriver drv;
         try {
-            Class.forName("org.apache.commons.dbcp.PoolingDriver");
-            driver = (PoolingDriver) DriverManager.getDriver("jdbc:apache:commons:dbcp:");
+            this.getClass().forName(driver);
+            this.getClass().forName("org.apache.commons.dbcp.PoolingDriver");
+            drv = (PoolingDriver) DriverManager.getDriver("jdbc:apache:commons:dbcp:");
 
-            driver.registerPool("jdbcprovider",connectionPool);
+            drv.registerPool("jdbcprovider",connectionPool);
         } catch (SQLException ex) {
             log.error("Failed to create ConnectionPool",ex);
             throw new InternalWikiException("SQLException during connection pool creation: "+ex.getMessage());

@@ -88,8 +88,13 @@ public abstract class JDBCBaseProvider implements WikiProvider {
         return config;
     }
     
-    public String getSQL(String key) {
-        return config.getSql(key);
+    public String getSQL(String key)  {
+        String sql = config.getSql(key);
+        if(sql == null || sql.length() == 0) {
+            getLog().error("SQL statement missing in configuration : "+key);
+            throw new RuntimeException("SQL statement missing in configuration : "+key);
+        }
+        return sql;
     }
     
     public abstract Category getLog();
@@ -138,8 +143,32 @@ public abstract class JDBCBaseProvider implements WikiProvider {
     }
     
     // public instead of protected by user request
-    public void releaseConnection( Connection connection ) {
-        config.releaseConnection(connection);
+    public void releaseConnection( Connection con ) {
+        releaseConnection(null,null,con);
+        
+    }
+    void releaseConnection(Statement stmt, Connection con) {
+        releaseConnection(null,stmt,con);
+    }
+    public void releaseConnection(ResultSet rs, Statement stmt, Connection con) {
+        try {
+            if(rs != null) {
+                rs.close();
+            }
+        } catch (SQLException ex) {
+            // Ignore, since nothing can be done
+        }
+        try {
+            if(stmt != null) {
+                stmt.close();
+            }
+            
+        } catch (SQLException ex) {
+            // Ignore, since nothing can be done
+        }
+         finally {
+            config.releaseConnection(con);
+        }
     }
     
     /**
@@ -167,4 +196,5 @@ public abstract class JDBCBaseProvider implements WikiProvider {
     protected WikiEngine getEngine() {
         return m_engine;
     }
+
 }
