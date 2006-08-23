@@ -27,6 +27,7 @@ import com.ecyrd.jspwiki.SearchResult;
 import com.ecyrd.jspwiki.SearchResultComparator;
 import com.ecyrd.jspwiki.WikiEngine;
 import com.ecyrd.jspwiki.WikiPage;
+import com.ecyrd.jspwiki.WikiProvider;
 import com.ecyrd.jspwiki.providers.ProviderException;
 import com.ecyrd.jspwiki.providers.WikiPageProvider;
 import com.ecyrd.jspwiki.util.ClassUtil;
@@ -125,46 +126,6 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         return found;
     }
 
-    /**
-     * Read the text directly from the correct file.
-     */
-    private String getCurrentPageText( String page )
-    {
-        PreparedStatement pstmt = null;
-        String pageText = null;
-        Connection con = null;
-        try
-        {
-            con = getConnection();
-            String sql = getSQL("getCurrent");
-            // SELECT TOP 1 PAGE_TEXT FROM WIKI_PAGE WHERE PAGE_NAME = ? ORDER BY PAGE_VERSION DESC
-            pstmt = con.prepareStatement( sql );
-            pstmt.setString( 1, page );
-            ResultSet rs = pstmt.executeQuery();
-
-            if( rs.next() )
-            {
-                pageText = rs.getString( 1 );
-            }
-            else
-            {
-                // This is okay.
-                info( "New page '" + page + "'" );
-            }
-
-        }
-        catch( SQLException se )
-        {
-            error( "unable to get current page text for " + page, se );
-        }
-        finally
-        {
-            releaseConnection(pstmt, con);
-        }
-
-        return pageText;
-    }
-
     public String getPageText( String page, int version )
             throws ProviderException
     {
@@ -172,9 +133,10 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         PreparedStatement pstmt = null;
         if( version == WikiPageProvider.LATEST_VERSION )
         {
-            return getCurrentPageText( page );
+            WikiPage current = getCurrentPageInfo(page);
+            version = current.getVersion();
         }
-
+        log.debug("Get "+page+" version "+version);
         String pageText = null;
         Connection con = null;
         try
@@ -209,103 +171,74 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         return pageText;
     }
 
-    private void insertPageText( WikiPage page, String text )
+    public void putPageText( WikiPage page, String text )
     {
-        Timestamp d;
+        String previousAuthor = "";
+        Date previousModified = new Date(0l);
+        int version = 0;
+        PreparedStatement pstmt = null;
         Connection con = null;
-        PreparedStatement pstmt = null;
-        try
-        {
-            // Start by determining the previous version
-            List versions = getVersionHistory(page.getName());
-            int version = 1;
-            if(versions.size() > 0) {
-                version = ((WikiPage)versions.get(0)).getVersion()+1;
-            }
-            
-            // Insert the version into database
+
+        WikiPage latest = getCurrentPageInfo(page.getName());
+        if(latest != null) {
+            version = latest.getVersion();
+            previousModified = latest.getLastModified();
+            previousAuthor = latest.getAuthor();
+        }
+
+        // If same author and saved again within continuationEditTimeout, save by 
+        // directly overwriting current version. 
+        // Create version, if not in continuationEdit, or if migrating, or if
+        // page is non-existant
+        boolean isDifferentAuthor = page.getAuthor() == null || page.getAuthor().equals("") || !page.getAuthor().equals(previousAuthor);
+        boolean isContinuationEditTimeExpired = System.currentTimeMillis() > getConfig().getContinuationEditTimeout() + previousModified.getTime();
+
+        boolean createVersion = m_migrating || !pageExists(page.getName()) || isDifferentAuthor || isContinuationEditTimeExpired;
+        try {
             con = getConnection();
-            String sql = getSQL("insertPage");
-            // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
-            pstmt = con.prepareStatement( sql );
-            pstmt.setString( 1, page.getName() );
-            pstmt.setInt( 2, version );
-            
-            if(m_migrating && page.getLastModified() != null) {
-                d = new Timestamp( page.getLastModified().getTime());
+            if(createVersion) {
+                // Insert page
+                if(!pageExists(page.getName())) {
+                    page.setVersion(1);
+                } else {
+                    page.setVersion(page.getVersion() + 1);
+                }
+                if(m_migrating && page.getLastModified() != null) {
+                    page.setLastModified(page.getLastModified());
+                } else {
+                    page.setLastModified(new Date());
+                }
+
+                log.debug("Create page version: "+page);
+                // Insert the version into database
+                String sql = getSQL("insertPage");
+                // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
+                pstmt = con.prepareStatement( sql );
+                pstmt.setString( 1, page.getName() );
+                pstmt.setInt( 2, page.getVersion() );
+
+                pstmt.setTimestamp( 3, new Timestamp(page.getLastModified().getTime()));
+                pstmt.setString( 4, page.getAuthor() );
+                pstmt.setString( 5, text );
             } else {
-                d = new Timestamp( System.currentTimeMillis() );
-            }
-            pstmt.setTimestamp( 3, d );
-            pstmt.setString( 4, page.getAuthor() );
-            pstmt.setString( 5, text );
-            pstmt.execute();
-        }
-        catch( SQLException se )
-        {
-            error( "Saving failed", se );
-        }
-        catch( ProviderException pe) 
-        {
-            error( "Failed to get version list",pe);
-        }
-        finally
-        {
-            releaseConnection(pstmt, con);
-        }
-    }
-
-    private void updatePageText( WikiPage page, String text )
-    {
-        PreparedStatement pstmt = null;
-        Connection connection = null;
-        try
-        {
-            WikiPage latest = getCurrentPageInfo(page.getName());
-            int version = latest.getVersion();
-            Date previousModified = latest.getLastModified();
-            String previousAuthor = latest.getAuthor();
-
-            /* If same author and saved again within m_continuationEditTimeout, save by directly overwriting,
-               i.e. keep version number and do not create a backup */
-            boolean isDifferentAuthor = page.getAuthor() == null || page.getAuthor().equals("") || !page.getAuthor().equals(previousAuthor);
-            boolean isContinuationEditTimeExpired = System.currentTimeMillis() > getConfig().getContinuationEditTimeout() + previousModified.getTime();
-            boolean createVersion = isDifferentAuthor || isContinuationEditTimeExpired;
-
-            if (createVersion) {
-                insertPageText(page, text);
-            } else {
+                // Update page
                 String sql = getSQL("updatePage");
-                // UPDATE WIKI_PAGE  SET PAGE_MODIFIED=?, PAGE_MODIFIED_BY=?, PAGE_TEXT=? WHERE PAGE_NAME =?, PAGE_VERSION=?
-                pstmt = connection.prepareStatement(sql);
+                // UPDATE WIKI_PAGE  SET PAGE_MODIFIED=?, PAGE_MODIFIED_BY=?, PAGE_TEXT=? WHERE PAGE_NAME =? AND PAGE_VERSION=?
+                log.debug("Updating version: "+latest+" "+version);
+                pstmt = con.prepareStatement(sql);
                 pstmt.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
                 pstmt.setString(2, page.getAuthor());
                 pstmt.setString(3, text);
                 pstmt.setString(4, page.getName());
                 pstmt.setInt(5, version);
-                pstmt.execute();
-                
             }
-        }
-        catch( SQLException se )
-        {
+            pstmt.execute();
+        } catch (SQLException se) {
             error( "Saving failed", se );
         }
         finally
         {
-            releaseConnection( pstmt, connection );
-        }
-    }
-
-    public void putPageText( WikiPage page, String text )
-    {
-        if( pageExists( page.getName() ) )
-        {
-            updatePageText( page, text );
-        }
-        else
-        {
-            insertPageText( page, text );
+            releaseConnection( pstmt, con );
         }
     }
 
@@ -433,7 +366,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 WikiPage page = ( WikiPage ) i.next();
                 try
                 {
-                    String pagetext = getCurrentPageText( page.getName() );
+                    String pagetext = getPageText( page.getName(), page.getVersion() );
                     SearchResult comparison = matcher.matchPageContent( page.getName(), pagetext );
                     if( comparison != null )
                     {
@@ -445,6 +378,10 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 {
                     error( "Failed to read", se );
                 }
+                catch( ProviderException pe ) 
+                {
+                    error( "Failed to read page: "+page,pe);
+                }
             }
 
         return res;
@@ -453,11 +390,11 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
     /**
      * Always returns the latest version here.
      */
-    private WikiPage getCurrentPageInfo( String page )
+    private WikiPage getCurrentPageInfo( String pageName )
     {
         ResultSet rs = null;
         PreparedStatement pstmt = null;
-        WikiPage p = null;
+        WikiPage page = null;
         Connection con = null;
         try
         {
@@ -465,27 +402,27 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
             String sql = getSQL("getCurrentInfo");
             // SELECT P1.PAGE_VERSION, P1.PAGE_MODIFIED, P1.PAGE_MODIFIED_BY FROM WIKI_PAGE P1 WHERE P1.PAGE_NAME=? AND P1.PAGE_VERSION = (SELECT MAX(PAGE_VERSION) FROM WIKI_PAGE P2 WHERE P2.PAGE_NAME=P1.PAGE_NAME)
             pstmt = con.prepareStatement( sql );
-            pstmt.setString( 1, page );
+            pstmt.setString( 1, pageName );
             rs = pstmt.executeQuery();
 
             if( rs.next() )
             {
-                p = new WikiPage( getEngine(), page );
-                p.setVersion( rs.getInt( 1 ) );
+                page = new WikiPage( getEngine(), pageName );
+                page.setVersion( rs.getInt( 1 ) );
                 // use Java Date for friendlier comparisons with other dates
-                p.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
-                p.setAuthor( rs.getString( 3 ) );
+                page.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
+                page.setAuthor( rs.getString( 3 ) );
             }
         }
         catch( SQLException se )
         {
-            error( "unable to get current page info for " + page, se );
+            error( "unable to get current page info for " + pageName, se );
         }
         finally
         {
             releaseConnection(rs, pstmt, con );
         }
-        return p;
+        return page;
     }
 
     /**
@@ -574,6 +511,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         {
             releaseConnection( rs, pstmt, con );
         }
+        log.debug("page versions: "+list);
         return list;
     }
 
