@@ -92,9 +92,18 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         debug( "Initializing JDBCPageProvider" );
         super.initialize( engine, properties );
         int count = getPageCount();
-        log.debug("Page count at startup: "+count);
-        if( count == 0 && getConfig().hasDesireToMigrate())
-            migratePages( engine);
+        debug("Page count at startup: "+count);
+        if( getConfig().hasDesireToMigrate())
+        {
+            if(count == 0) 
+            {
+                migratePages( engine);
+            } else {
+                info("Migration not possible, because the table is not empty.");
+                info("   - either truncate table WIKI_PAGE or");
+                info("   - remove migration flag");
+            }
+        }
     }
 
     public boolean pageExists( String page )
@@ -136,7 +145,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
             WikiPage current = getCurrentPageInfo(page);
             version = current.getVersion();
         }
-        log.debug("Get "+page+" version "+version);
+        debug("Get "+page+" version "+version);
         String pageText = null;
         Connection con = null;
         try
@@ -209,7 +218,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                     page.setLastModified(new Date());
                 }
 
-                log.debug("Create page version: "+page);
+                debug("Create page version: "+page);
                 // Insert the version into database
                 String sql = getSQL("insertPage");
                 // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
@@ -224,7 +233,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 // Update page
                 String sql = getSQL("updatePage");
                 // UPDATE WIKI_PAGE  SET PAGE_MODIFIED=?, PAGE_MODIFIED_BY=?, PAGE_TEXT=? WHERE PAGE_NAME =? AND PAGE_VERSION=?
-                log.debug("Updating version: "+latest+" "+version);
+                debug("Updating version: "+latest+" "+version);
                 pstmt = con.prepareStatement(sql);
                 pstmt.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
                 pstmt.setString(2, page.getAuthor());
@@ -511,7 +520,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         {
             releaseConnection( rs, pstmt, con );
         }
-        log.debug("page versions: "+list);
+        debug("page versions: "+list);
         return list;
     }
 
@@ -599,15 +608,17 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
     }
 
     /**
-     * Copies pages from one provider to this provider.  The source,
+     * Copies allPages from one provider to this provider.  The source,
      * "import" provider is specified by the properties file at
      * the given path.
      */
     private void migratePages( WikiEngine engine)
             throws IOException
     {
+        PreparedStatement pstmt;
+        Connection con;
         Properties importProps = new Properties();
-        log.info("Migrating pages from: "+getConfig().getMigrateFrom());
+        info("Migrating pages from: "+getConfig().getMigrateFrom());
         importProps.load( new FileInputStream( getConfig().getMigrateFrom()) );
         String classname = importProps.getProperty( PageManager.PROP_PAGEPROVIDER );
 
@@ -620,7 +631,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         }
         catch( Exception e )
         {
-            log.error( "Unable to locate/instantiate import provider class " + classname, e );
+            error( "Unable to locate/instantiate import provider class " + classname, e );
             return;
         }
         try
@@ -628,27 +639,43 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
             m_migrating = true; 
             importProvider.initialize( engine, importProps );
 
-            Collection pages = importProvider.getAllPages();
-            for( Iterator i = pages.iterator(); i.hasNext(); )
+            Collection allPages = importProvider.getAllPages();
+            con = getConnection();
+            String sql = getSQL("insertPage");
+            // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
+            pstmt = con.prepareStatement( sql );
+            for( Iterator i = allPages.iterator(); i.hasNext(); )
             {
                 WikiPage latest = ( WikiPage ) i.next();
 
-                int version = 1;
-                boolean done = false;
-                while( !done )
-                {
-                    WikiPage page = importProvider.getPageInfo( latest.getName(), version );
-                    if( page == null )
-                        done = true;
-                    else
-                    {
-                        String text = importProvider.getPageText( page.getName(), version );
-                        putPageText( page, text );
-                        if (page.getVersion() >= latest.getVersion())
-                            done = true;
-                        version += 1;
+                List pages = importProvider.getVersionHistory(latest.getName());
+                if(pages.size() > 0) {
+                    
+                   info("Migrating "+pages.size()+" versions of "+latest.getName());
+                   for(Iterator p = pages.iterator();p.hasNext();) {
+                        WikiPage page = (WikiPage)p.next();
+                        String text = importProvider.getPageText( page.getName(), page.getVersion());
+                        // Insert the version into database
+                        pstmt.setString( 1, page.getName() );
+                        pstmt.setInt( 2, page.getVersion() );
+
+                        pstmt.setTimestamp( 3, new Timestamp(page.getLastModified().getTime()));
+                        pstmt.setString( 4, page.getAuthor() );
+                        pstmt.setString( 5, text );
+                        pstmt.execute();
                     }
-                    info("Migrated page: "+page);
+
+                } else {
+                        info("Migrating "+latest.getName());
+                        String text = importProvider.getPageText( latest.getName(), latest.getVersion());
+                        // Insert the version into database
+                        pstmt.setString( 1, latest.getName() );
+                        pstmt.setInt( 2, latest.getVersion() );
+
+                        pstmt.setTimestamp( 3, new Timestamp(latest.getLastModified().getTime()));
+                        pstmt.setString( 4, latest.getAuthor() );
+                        pstmt.setString( 5, text );
+                        pstmt.execute();
                 }
             }
         }
@@ -659,7 +686,11 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         catch( NoRequiredPropertyException e )
         {
             throw new IOException( e.getMessage() );
-        } finally {
+        }
+        catch( SQLException e) {
+            throw new IOException( e.getMessage() );
+        }
+        finally {
             m_migrating = false;
         }
     }

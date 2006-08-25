@@ -34,6 +34,7 @@ import java.util.Date;
 
 /*
  * History:
+ *   2006-08-25 SBG Touching up connection and prepared statement cleanup
  *   2006-05-30 MT  Added missing check for version == WikiProvider.LATEST_VERSION
  *                  in getAttachmentData(Attachment att)
  *   2006-04-26 MT  Changed comment for listAttachments() to reflect actual SQL
@@ -75,8 +76,14 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         super.initialize( engine, properties);
         int count = getAttachmentCount();
         log.debug("Attachment count at startup: "+count);
-        if( count == 0 && getConfig().hasDesireToMigrate()) {
-            migratePages( engine );
+        if( getConfig().hasDesireToMigrate()) {
+            if(count == 0) {
+                migrateAttachments( engine );
+            } else {
+                info("Attachment migration not possible, because the table is not empty.");
+                info("   - either truncate table WIKI_ATT or");
+                info("   - remove migration flag");
+            }
         }
         
     }
@@ -84,20 +91,20 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     public int getAttachmentCount() {
         int count = 0;
         Connection connection = null;
+        Statement stmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getCount");
             // SELECT COUNT(*) FROM WIKI_ATT
-            Statement stmt = connection.createStatement();
-            ResultSet rs = stmt.executeQuery( sql );
+            stmt = connection.createStatement();
+            rs = stmt.executeQuery( sql );
             rs.next();
             count = rs.getInt( 1 );
-            rs.close();
-            stmt.close();
         } catch( SQLException se ) {
             error( "unable to get attachment count ", se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs,stmt,connection );
         }
         return count;
         
@@ -110,8 +117,10 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         FileUtil.copyContents( dataStream, baos );
         byte data[] = baos.toByteArray();
         int version = findLatestVersion( att ) + 1;
+
         //att.setVersion(version);
         Connection connection = null;
+        PreparedStatement pstmt = null;
         try {
             connection = getConnection();
             String sql = getSQL("insert");
@@ -119,10 +128,14 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, ATT_LENGTH)
             // VALUES (?, ?, ?, ?, ?, ?,?)
             
-            PreparedStatement psPage = connection.prepareStatement( sql );
-            psPage.setString( 1, att.getParentName() );
-            psPage.setString( 2, att.getFileName() );
-            psPage.setInt( 3, version );
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            if(m_migrating) {
+                pstmt.setInt( 3, att.getVersion() );
+            } else {
+                pstmt.setInt( 3, version );
+            }
             
             Timestamp d;
             if( m_migrating && att.getLastModified() != null ) {
@@ -131,16 +144,15 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 d = new Timestamp( System.currentTimeMillis() );
             }
             
-            psPage.setTimestamp( 4, d );
-            psPage.setString( 5, att.getAuthor() );
-            psPage.setBytes( 6, data );
-            psPage.setInt( 7, data.length);
-            psPage.execute();
-            psPage.close();
+            pstmt.setTimestamp( 4, d );
+            pstmt.setString( 5, att.getAuthor() );
+            pstmt.setBytes( 6, data );
+            pstmt.setInt( 7, data.length);
+            pstmt.execute();
         } catch( SQLException se ) {
             error( "Saving attachment failed " + att, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( pstmt, connection );
         }
     }
     
@@ -150,18 +162,20 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         if( version == WikiProvider.LATEST_VERSION )
             version = findLatestVersion( att );
         
-    InputStream result = null;
+        InputStream result = null;
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getData");
             // SELECT ATT_DATA FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
 
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
-            ps.setInt( 3, version );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            pstmt.setInt( 3, version );
+            rs = pstmt.executeQuery();
             
             if( rs.next() ) {
                 byte[] bytes = rs.getBytes( 1 );
@@ -169,13 +183,11 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             } else {
                 error( "No attachments to read; '" + att + "'", new SQLException( "empty attachment set" ) );
             }
-            rs.close();
-            ps.close();
             
         } catch( SQLException se ) {
             error( "Unable to read attachment '" + att + "'", se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs,pstmt,connection );
         }
         return result;
     }
@@ -184,14 +196,16 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     public Collection listAttachments( WikiPage page ) throws ProviderException {
         Collection result = new ArrayList();
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getList");
             //SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? ORDER BY ATT_FILENAME, ATT_VERSION DESC;
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, page.getName() );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, page.getName() );
+            rs = pstmt.executeQuery();
             
             String previousFileName = "";
             while( rs.next() ) {
@@ -208,13 +222,11 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 result.add( att );
                 previousFileName = fileName.toString();
             }
-            rs.close();
-            ps.close();
             
         } catch( SQLException se ) {
             error( "Unable to list attachments", se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs, pstmt, connection );
         }
         return result;
     }
@@ -227,15 +239,17 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         List changedList = new ArrayList();
         
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getChanged");
             // SELECT ATT_PAGENAME, ATT_FILENAME, LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION
             // FROM WIKI_ATT WHERE ATT_MODIFIED > ? ORDER BY ATT_MODIFIED DESC
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setTimestamp( 1, new Timestamp( timestamp.getTime() ) );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setTimestamp( 1, new Timestamp( timestamp.getTime() ) );
+            rs = pstmt.executeQuery();
             while( rs.next() ) {
                 Attachment att = new Attachment( getEngine(), rs.getString( 1 ), rs.getString( 2 ) );
                 att.setSize( rs.getInt( 3 ) );
@@ -245,12 +259,10 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 att.setVersion( rs.getInt( 6 ) );
                 changedList.add( att );
             }
-            rs.close();
-            ps.close();
         } catch( SQLException se ) {
             error( "Error getting changed list, since " + timestamp, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs, pstmt, connection );
         }
         
         return changedList;
@@ -258,16 +270,18 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     
     public Attachment getAttachmentInfo( WikiPage page, String name, int version ) throws ProviderException {
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getInfo");   // latest version is first
             // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, page.getName() );
-            ps.setString( 2, name );
-            ps.setInt( 3, version );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, page.getName() );
+            pstmt.setString( 2, name );
+            pstmt.setInt( 3, version );
+            rs = pstmt.executeQuery();
             
             Attachment att = null;
             if( rs.next() ) {
@@ -280,14 +294,12 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             } else {
                 debug( "No attachment info for " + page + "/" + name + ":" + version );
             }
-            rs.close();
-            ps.close();
             return att;
         } catch( SQLException se ) {
             error( "Unable to get attachment info for " + page + "/" + name + ":" + version, se );
             return null;
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs, pstmt, connection );
         }
     }
     
@@ -301,25 +313,25 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     private int findLatestVersion( Attachment att ) {
         int version = 0;
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getLatestVersion");
             // SELECT ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC LIMIT 1
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            rs = pstmt.executeQuery();
             
             if( rs.next() )
                 version = rs.getInt( 1 );
-            rs.close();
-            ps.close();
             
         } catch( SQLException se ) {
             error( "Error trying to find latest attachment: " + att, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs,pstmt,connection );
         }
         return version;
     }
@@ -327,15 +339,17 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     public List getVersionHistory( Attachment att ) {
         List list = new ArrayList();
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         try {
             connection = getConnection();
             String sql = getSQL("getVersions");   // latest version is first
             // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
-            ResultSet rs = ps.executeQuery();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            rs = pstmt.executeQuery();
             
             while( rs.next() ) {
                 Attachment vAtt = new Attachment( getEngine(), att.getParentName(), att.getFileName() );
@@ -346,53 +360,52 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 vAtt.setVersion( rs.getInt(4) );
                 list.add( vAtt );
             }
-            rs.close();
-            ps.close();
             
         } catch( SQLException se ) {
             error( "Unable to list attachment version history for " + att, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( rs, pstmt, connection );
         }
         return list;
     }
     
     public void deleteVersion( Attachment att ) throws ProviderException {
+        PreparedStatement pstmt = null;
         Connection connection = null;
         try {
             connection = getConnection();
             String sql = getSQL("deleteVersion");
             // DELETE FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
-            ps.setInt( 3, att.getVersion() );
-            ps.execute();
-            ps.close();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            pstmt.setInt( 3, att.getVersion() );
+            pstmt.execute();
         } catch( SQLException se ) {
             error( "Delete attachment version failed " + att, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( pstmt, connection );
         }
     }
     
     public void deleteAttachment( Attachment att ) throws ProviderException {
+        PreparedStatement pstmt = null;
         Connection connection = null;
         try {
             connection = getConnection();
             String sql = getSQL("delete");
             // DELETE FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ?
             
-            PreparedStatement ps = connection.prepareStatement( sql );
-            ps.setString( 1, att.getParentName() );
-            ps.setString( 2, att.getFileName() );
-            ps.execute();
-            ps.close();
+            pstmt = connection.prepareStatement( sql );
+            pstmt.setString( 1, att.getParentName() );
+            pstmt.setString( 2, att.getFileName() );
+            pstmt.execute();
+            pstmt.close();
         } catch( SQLException se ) {
             error( "Delete attachment failed " + att, se );
         } finally {
-            releaseConnection( connection );
+            releaseConnection( pstmt, connection );
         }
     }
     
@@ -408,22 +421,22 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
      */
     public void moveAttachmentsForPage(String oldParent, String newParent) throws ProviderException {
         Connection connection = null;
+        PreparedStatement ps = null;
         try {
             connection = getConnection();
             String sql = getSQL("move");
             // UPDATE WIKI_ATT SET ATT_PAGE_NAME = ? WHERE ATT_PAGE_NAME = ?
             
-            PreparedStatement ps = connection.prepareStatement(sql);
+            ps = connection.prepareStatement(sql);
             ps.setString(1, newParent);
             ps.setString(2, oldParent);
             ps.execute();
-            ps.close();
         } catch (SQLException se) {
             String message = "Moving attachment '" + oldParent + "' to '" + newParent + "' failed";
             error(message, se);
             throw new ProviderException(message + ": " + se.getMessage());
         } finally {
-            releaseConnection(connection);
+            releaseConnection(ps,connection);
         }
     }
     
@@ -432,7 +445,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
      * "import" provider is specified by the properties file at
      * the given path.
      */
-    private void migratePages( WikiEngine engine )
+    private void migrateAttachments( WikiEngine engine )
     throws IOException {
         Properties importProps = new Properties();
         log.info("Migrating attachments from: "+getConfig().getMigrateFrom());
@@ -456,8 +469,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             for( Iterator i = attachments.iterator(); i.hasNext(); ) {
                 Attachment att = ( Attachment ) i.next();
                 InputStream data = importProvider.getAttachmentData( att );
-                putAttachmentData( att, data );
-                info("Migrated Attachment: "+att);
+                info("Migrating Attachment: "+att);
+                putAttachmentData(att,data);
             }
         } catch( ProviderException e ) {
             throw new IOException( e.getMessage() );
