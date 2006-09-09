@@ -14,7 +14,7 @@ STATUS
 
 Beta
 Released 2006-08-23
-Tested with JSPWiki 2.4.15-beta
+Tested with JSPWiki 2.4.15-beta and 2.3.40-beta
 
 RECENT CHANGES
 
@@ -121,7 +121,14 @@ On Sybase do this:
   go
 
 On Mysql do this:
-TODO: Describe the Mysql way of migrating data
+
+INSERT INTO wiki_page (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT)
+       SELECT VERSION_NAME, VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY, VERSION_TEXT
+              FROM YourOldDB.wiki_page_versions;
+
+INSERT INTO wiki_att (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, ATT_LENGTH)
+       SELECT ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, LENGTH(ATT_DATA)
+              FROM YourOldDB.wiki_att;
 
 CONTENTS
 
