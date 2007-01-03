@@ -12,7 +12,6 @@ package com.forthgo.jspwiki.jdbcprovider;
 import com.ecyrd.jspwiki.InternalWikiException;
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.WikiEngine;
-import com.ecyrd.jspwiki.WikiException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -41,7 +40,7 @@ public class JNDIConnectionProvider extends ConnectionProvider {
     public JNDIConnectionProvider() {
     }
 
-    public void initialize(final Properties config) throws NoRequiredPropertyException {
+    public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {
         jndiDatasource = WikiEngine.getRequiredProperty(config, "jndi.datasource");
         try {
             Context ctx = new InitialContext();
@@ -55,7 +54,7 @@ public class JNDIConnectionProvider extends ConnectionProvider {
         }
     }
     
-    public Connection getConnection() throws SQLException {
+    public Connection getConnection(WikiEngine engine) throws SQLException {
         return ds.getConnection();
     }
     

@@ -5,9 +5,12 @@
  *
  */
 
+
 package com.forthgo.jspwiki.jdbcprovider;
 
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
+import com.ecyrd.jspwiki.WikiEngine;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -24,9 +27,9 @@ import java.util.Properties;
  * @author glasius
  */
 public abstract class ConnectionProvider {
-    public abstract void initialize(Properties wikiProps) throws NoRequiredPropertyException;
+    public abstract void initialize(WikiEngine engine, Properties wikiProps) throws NoRequiredPropertyException;
     
-    public abstract Connection getConnection() throws SQLException;
+    public abstract Connection getConnection(WikiEngine engine) throws SQLException;
     
     public void releaseConnection(Connection connection)  {
         try {

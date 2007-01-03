@@ -21,10 +21,7 @@ package com.forthgo.jspwiki.jdbcprovider;
 
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.WikiEngine;
-import com.ecyrd.jspwiki.WikiException;
 import com.ecyrd.jspwiki.WikiProvider;
-import java.io.File;
-import java.io.FileNotFoundException;
 import org.apache.log4j.Category;
 
 import java.io.IOException;
@@ -65,7 +62,7 @@ public abstract class JDBCBaseProvider implements WikiProvider {
     
     private WikiEngine m_engine;
     
-    private static JDBCProviderConfiguration config;
+    private JDBCProviderConfiguration config;
     
     /**
      * @throws java.io.FileNotFoundException If the specified page directory does not exist.
@@ -111,7 +108,7 @@ public abstract class JDBCBaseProvider implements WikiProvider {
         getLog().error( message, t );
     }
     
-    
+/*    
     private void checkConnection() throws SQLException {
         Connection connection = null;
         try {
@@ -123,6 +120,7 @@ public abstract class JDBCBaseProvider implements WikiProvider {
             releaseConnection( connection );
         }
     }
+*/
     
     public boolean isConnectionOK(Connection connection) {
         try {

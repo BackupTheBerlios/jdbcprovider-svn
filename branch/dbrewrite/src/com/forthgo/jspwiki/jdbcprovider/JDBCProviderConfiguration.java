@@ -11,14 +11,10 @@ import com.ecyrd.jspwiki.InternalWikiException;
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.TextUtil;
 import com.ecyrd.jspwiki.WikiEngine;
-import com.ecyrd.jspwiki.util.ClassUtil;
-
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
-import org.apache.commons.jocl.ConstructorUtil;
 import org.apache.log4j.Category;
 
 /*
@@ -52,22 +48,13 @@ public class JDBCProviderConfiguration {
     /** Creates a new instance of JDBCProviderConfiguration */
     public JDBCProviderConfiguration(WikiEngine engine, String configPath) throws IOException, NoRequiredPropertyException {
         m_wikiEngine = engine;
-        String pageProperties[] = new String[] {"pageExists", "getCurrent", "getVersion",
-        "insertCurrent", "insertVersion", "getCurrentInfo", "getVersionInfo",
-        "updateCurrent", "getAllPages", "getAllPagesSince", "getPageCount",
-        "getVersions", "deleteCurrent", "deleteVersion", "deleteVersions",
-        "renameCurrent", "renameVersions", "updateVersion"};
-        String attachmentProperties[] = new String[] {"getCount", "insert", "getData",
-        "getList", "getChanged", "getInfo", "getLatestVersion",
-        "getVersions", "deleteVersion", "delete", "move"};
-        
-        config = loadProperties(configPath);
+      config = loadProperties(configPath);
         
         
-        setupDbProvider(WikiEngine.getRequiredProperty(config, "connectionProvider"));
+        setupDbProvider(engine, WikiEngine.getRequiredProperty(config, "connectionProvider"));
         
         
-        setupSqlQueries(WikiEngine.getRequiredProperty(config, "database.flavour"));
+        setupSqlQueries(engine, WikiEngine.getRequiredProperty(config, "database.flavour"));
         
     }
     
@@ -75,7 +62,7 @@ public class JDBCProviderConfiguration {
     
     
     public Connection getConnection() throws SQLException {
-        return connectionProvider.getConnection();
+        return connectionProvider.getConnection(m_wikiEngine);
     }
     
     public void releaseConnection(Connection connection ) {
@@ -100,13 +87,13 @@ public class JDBCProviderConfiguration {
     }
     
     
-    private void setupDbProvider(final String cpClass) throws InternalWikiException, NoRequiredPropertyException {
+    private void setupDbProvider(WikiEngine engine, final String cpClass) throws InternalWikiException, NoRequiredPropertyException {
         try {
-            Class clazz = getClass().forName(cpClass);
+            Class clazz = Class.forName(cpClass);
             log.debug("dataconnectionProvider: "+clazz.getName());
             
             connectionProvider = (ConnectionProvider) clazz.newInstance();
-            connectionProvider.initialize(config);
+            connectionProvider.initialize(engine, config);
         } catch (InstantiationException ex) {
             log.error("Error instantiating connectionProvider: ",ex);
             throw new InternalWikiException("Error instantiating connectionProvider: "+ex.getMessage());
@@ -119,7 +106,7 @@ public class JDBCProviderConfiguration {
         }
     }
     
-    private void setupSqlQueries(final String dbFlavour) throws IOException {
+    private void setupSqlQueries(WikiEngine engine, final String dbFlavour) throws IOException {
         sql = loadProperties("jdbcprovider."+dbFlavour+".properties");
         log.debug("queries: "+sql.toString());
     }

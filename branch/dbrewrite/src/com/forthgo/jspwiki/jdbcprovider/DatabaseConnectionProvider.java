@@ -31,7 +31,7 @@ public class DatabaseConnectionProvider extends ConnectionProvider {
     public DatabaseConnectionProvider() {
     }
 
-    public void initialize(final Properties config) throws NoRequiredPropertyException {
+    public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {
         String driver = WikiEngine.getRequiredProperty(config, "jdbc.driverClassName");
         url = WikiEngine.getRequiredProperty(config, "jdbc.url");
         username = WikiEngine.getRequiredProperty(config, "jdbc.username");
@@ -43,7 +43,7 @@ public class DatabaseConnectionProvider extends ConnectionProvider {
         }
     }
     
-    public Connection getConnection() throws SQLException {
+    public Connection getConnection(WikiEngine engine) throws SQLException {
         return DriverManager.getConnection( url, username, password );
     }
     

@@ -40,7 +40,7 @@ public class DBCPConnectionProvider extends ConnectionProvider {
     public DBCPConnectionProvider()  {
     }
 
-    public void initialize(final Properties config) throws NoRequiredPropertyException {
+    public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {
         log.debug("Initializing DBCPConnectionProvider");
 
         factory = WikiEngine.getRequiredProperty(config, "dbcp.factory");
@@ -51,15 +51,20 @@ public class DBCPConnectionProvider extends ConnectionProvider {
         log.debug("-factory: "+factory+", driver: "+driver+", url: "+url+", username: "+username);
         
         GenericObjectPool connectionPool = new GenericObjectPool(null);
+
         ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
-        PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
+        
+		new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
+		
         PoolingDriver drv;
+        
         try {
-            this.getClass().forName(driver);
-            this.getClass().forName("org.apache.commons.dbcp.PoolingDriver");
+            Class.forName(driver);
+            Class.forName("org.apache.commons.dbcp.PoolingDriver");
             drv = (PoolingDriver) DriverManager.getDriver("jdbc:apache:commons:dbcp:");
 
-            drv.registerPool("jdbcprovider",connectionPool);
+            drv.registerPool(engine.getApplicationName(),connectionPool);
+            
         } catch (SQLException ex) {
             log.error("Failed to create ConnectionPool",ex);
             throw new InternalWikiException("SQLException during connection pool creation: "+ex.getMessage());
@@ -69,8 +74,9 @@ public class DBCPConnectionProvider extends ConnectionProvider {
         }
     }
 
-    public Connection getConnection() throws SQLException {
-            return DriverManager.getConnection("jdbc:apache:commons:dbcp:jdbcprovider");
+    
+    public Connection getConnection(WikiEngine engine) throws SQLException {
+            return DriverManager.getConnection("jdbc:apache:commons:dbcp:"+engine.getApplicationName());
     }
 
 

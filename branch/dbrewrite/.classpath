@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="C:/dev/org.jspwiki/JSPWiki/build/JSPWiki/WEB-INF/lib/log4j.jar"/>
+	<classpathentry kind="lib" path="C:/dev/org.jspwiki/JSPWiki/build/JSPWiki.jar"/>
+	<classpathentry kind="lib" path="lib/commons-dbcp-1.2.1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-lang-2.1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-pool-1.2.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/JSPWiki-2.4"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -34,6 +34,8 @@ import java.util.Date;
 
 /*
  * History:
+ *   2006-09-30 MCT Added missing check for version == WikiProvider.LATEST_VERSION
+ *   				in getAttachmentInfo(). Slight refactoring of params to findLatestVersion().
  *   2006-08-25 SBG Touching up connection and prepared statement cleanup
  *   2006-05-30 MT  Added missing check for version == WikiProvider.LATEST_VERSION
  *                  in getAttachmentData(Attachment att)
@@ -59,12 +61,14 @@ import java.util.Date;
  * @author Thierry Lach
  * @author Xan Gregg
  * @author Søren Berg Glasius
+ * @author Milton Taylor
  * @see JDBCPageProvider
  */
 public class JDBCAttachmentProvider extends JDBCBaseProvider
         implements WikiAttachmentProvider {
     
-    
+	WikiEngine m_WikiEngine;
+ 
     protected static final Category log = Category.getInstance( JDBCAttachmentProvider.class );
     
     public String getProviderInfo() {
@@ -74,6 +78,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     public void initialize(WikiEngine engine, Properties properties) throws NoRequiredPropertyException, IOException {
         debug( "Initializing JDBCAttachmentProvider" );
         super.initialize( engine, properties);
+        m_WikiEngine = engine;
         int count = getAttachmentCount();
         log.debug("Attachment count at startup: "+count);
         if( getConfig().hasDesireToMigrate()) {
@@ -116,7 +121,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         FileUtil.copyContents( dataStream, baos );
         byte data[] = baos.toByteArray();
-        int version = findLatestVersion( att ) + 1;
+        int version = findLatestVersion( att.getParentName(), att.getFileName() ) + 1;
 
         //att.setVersion(version);
         Connection connection = null;
@@ -125,8 +130,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             connection = getConnection();
             String sql = getSQL("insert");
             // INSERT INTO WIKI_ATT
-            // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, ATT_LENGTH)
-            // VALUES (?, ?, ?, ?, ?, ?,?)
+            // (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_REVNOTE, ATT_DATA, ATT_LENGTH)
+            // VALUES (?, ?, ?, ?, ?, ?,?,?)
             
             pstmt = connection.prepareStatement( sql );
             pstmt.setString( 1, att.getParentName() );
@@ -146,8 +151,9 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             
             pstmt.setTimestamp( 4, d );
             pstmt.setString( 5, att.getAuthor() );
-            pstmt.setBytes( 6, data );
-            pstmt.setInt( 7, data.length);
+            pstmt.setString(6, (String)att.getAttribute(WikiPage.CHANGENOTE));
+            pstmt.setBytes( 7, data );
+            pstmt.setInt( 8, data.length);
             pstmt.execute();
         } catch( SQLException se ) {
             error( "Saving attachment failed " + att, se );
@@ -160,7 +166,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         
         int version = att.getVersion();
         if( version == WikiProvider.LATEST_VERSION )
-            version = findLatestVersion( att );
+            version = findLatestVersion( att.getParentName(), att.getFileName() );
+        
         
         InputStream result = null;
         Connection connection = null;
@@ -194,7 +201,9 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     
     // latest versions only
     public Collection listAttachments( WikiPage page ) throws ProviderException {
-        Collection result = new ArrayList();
+      
+    	
+    	Collection result = new ArrayList();
         Connection connection = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -232,6 +241,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     }
     
     public Collection findAttachments( QueryItem[] query ) {
+    	   	
         return new ArrayList(); // fixme
     }
     
@@ -269,6 +279,10 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     }
     
     public Attachment getAttachmentInfo( WikiPage page, String name, int version ) throws ProviderException {
+    	
+        if (version == LATEST_VERSION)
+            version = findLatestVersion(page.getName(), name);
+   	
         Connection connection = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -310,7 +324,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
      * @return Latest version number in the repository, or 0, if
      *         there is no page in the repository.
      */
-    private int findLatestVersion( Attachment att ) {
+    private int findLatestVersion( String PageName, String FileName ) {
         int version = 0;
         Connection connection = null;
         PreparedStatement pstmt = null;
@@ -321,15 +335,15 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             // SELECT ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC LIMIT 1
             
             pstmt = connection.prepareStatement( sql );
-            pstmt.setString( 1, att.getParentName() );
-            pstmt.setString( 2, att.getFileName() );
+            pstmt.setString( 1, PageName );
+            pstmt.setString( 2, FileName );
             rs = pstmt.executeQuery();
             
             if( rs.next() )
                 version = rs.getInt( 1 );
             
         } catch( SQLException se ) {
-            error( "Error trying to find latest attachment: " + att, se );
+            error( "Error trying to find latest attachment: " + PageName + "/" + FileName, se );
         } finally {
             releaseConnection( rs,pstmt,connection );
         }

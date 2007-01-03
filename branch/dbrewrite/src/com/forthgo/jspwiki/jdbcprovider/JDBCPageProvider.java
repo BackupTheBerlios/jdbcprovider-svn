@@ -27,7 +27,6 @@ import com.ecyrd.jspwiki.SearchResult;
 import com.ecyrd.jspwiki.SearchResultComparator;
 import com.ecyrd.jspwiki.WikiEngine;
 import com.ecyrd.jspwiki.WikiPage;
-import com.ecyrd.jspwiki.WikiProvider;
 import com.ecyrd.jspwiki.providers.ProviderException;
 import com.ecyrd.jspwiki.providers.WikiPageProvider;
 import com.ecyrd.jspwiki.util.ClassUtil;
@@ -51,6 +50,7 @@ import org.apache.log4j.Category;
 
 /*
  * History:
+ *   2006-09-30	MCT	Fix for bug: null pointer exception editing new page in getPageText()
  *   2006-08-22 SBG Total rewrite of the tables. Droped WIKI_PAGE_VERSIONS
  *                  Now only using WIKI_PAGE for page versions
  *   2006-03-26 XG  Fix a bug reported by Andreas Kohlbecker where the versions
@@ -82,17 +82,22 @@ import org.apache.log4j.Category;
  * @author Thierry Lach
  * @author Xan Gregg
  * @author Søren Berg Glasius
+ * @author Milton Taylor
  */
 public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvider {
 
+	WikiEngine m_WikiEngine;
+	
     protected static final Category log = Category.getInstance( JDBCPageProvider.class );
 
     public void initialize(WikiEngine engine, Properties properties) throws NoRequiredPropertyException, IOException
     {
         debug( "Initializing JDBCPageProvider" );
         super.initialize( engine, properties );
+        m_WikiEngine = engine;
         int count = getPageCount();
         debug("Page count at startup: "+count);
+        debug("Database->"+getConfig().toString());
         if( getConfig().hasDesireToMigrate())
         {
             if(count == 0) 
@@ -143,7 +148,11 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         if( version == WikiPageProvider.LATEST_VERSION )
         {
             WikiPage current = getCurrentPageInfo(page);
-            version = current.getVersion();
+            
+            if (current != null)
+            	version = current.getVersion();
+            else
+            	return (null);
         }
         debug("Get "+page+" version "+version);
         String pageText = null;
@@ -221,25 +230,27 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 debug("Create page version: "+page);
                 // Insert the version into database
                 String sql = getSQL("insertPage");
-                // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
+                // INSERT INTO WIKI_PAGE (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_REVNOTE, PAGE_TEXT) VALUES (?, ?, ?, ?, ?)
                 pstmt = con.prepareStatement( sql );
                 pstmt.setString( 1, page.getName() );
                 pstmt.setInt( 2, page.getVersion() );
 
                 pstmt.setTimestamp( 3, new Timestamp(page.getLastModified().getTime()));
                 pstmt.setString( 4, page.getAuthor() );
-                pstmt.setString( 5, text );
+                pstmt.setString(5, (String)page.getAttribute(WikiPage.CHANGENOTE));
+                pstmt.setString( 6, text );
             } else {
                 // Update page
                 String sql = getSQL("updatePage");
-                // UPDATE WIKI_PAGE  SET PAGE_MODIFIED=?, PAGE_MODIFIED_BY=?, PAGE_TEXT=? WHERE PAGE_NAME =? AND PAGE_VERSION=?
+                // UPDATE WIKI_PAGE  SET PAGE_MODIFIED=?, PAGE_MODIFIED_BY=?, PAGE_REVNOTE=?, PAGE_TEXT=? WHERE PAGE_NAME =? AND PAGE_VERSION=?
                 debug("Updating version: "+latest+" "+version);
                 pstmt = con.prepareStatement(sql);
                 pstmt.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
                 pstmt.setString(2, page.getAuthor());
-                pstmt.setString(3, text);
-                pstmt.setString(4, page.getName());
-                pstmt.setInt(5, version);
+                pstmt.setString(3, (String)page.getAttribute(WikiPage.CHANGENOTE));
+                pstmt.setString(4, text);
+                pstmt.setString(5, page.getName());
+                pstmt.setInt(6, version);
             }
             pstmt.execute();
         } catch (SQLException se) {
@@ -368,7 +379,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         {
         }
 
-        nextfile:
+//      nextfile:
             for( Iterator i = wikipages.iterator(); i.hasNext(); )
             {
                 // debug("Searching page "+wikipages[i].getPath() );
@@ -409,7 +420,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         {
             con = getConnection();
             String sql = getSQL("getCurrentInfo");
-            // SELECT P1.PAGE_VERSION, P1.PAGE_MODIFIED, P1.PAGE_MODIFIED_BY FROM WIKI_PAGE P1 WHERE P1.PAGE_NAME=? AND P1.PAGE_VERSION = (SELECT MAX(PAGE_VERSION) FROM WIKI_PAGE P2 WHERE P2.PAGE_NAME=P1.PAGE_NAME)
+            // SELECT P1.PAGE_VERSION, P1.PAGE_MODIFIED, P1.PAGE_MODIFIED_BY, P1.REVNOTE FROM WIKI_PAGE P1 WHERE P1.PAGE_NAME=? AND P1.PAGE_VERSION = (SELECT MAX(PAGE_VERSION) FROM WIKI_PAGE P2 WHERE P2.PAGE_NAME=P1.PAGE_NAME)
             pstmt = con.prepareStatement( sql );
             pstmt.setString( 1, pageName );
             rs = pstmt.executeQuery();
@@ -421,6 +432,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 // use Java Date for friendlier comparisons with other dates
                 page.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
                 page.setAuthor( rs.getString( 3 ) );
+                if( rs.getString(4) != null ) page.setAttribute( WikiPage.CHANGENOTE, rs.getString(4) );
             }
         }
         catch( SQLException se )
@@ -454,7 +466,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
             {
                 con = getConnection();
                 String sql = getSQL("getVersionInfo");
-                // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE WHERE PAGE_NAME = ? AND PAGE_VERSION = ?
+                // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_REVNOTE FROM WIKI_PAGE WHERE PAGE_NAME = ? AND PAGE_VERSION = ?
                 pstmt = con.prepareStatement( sql );
                 pstmt.setString( 1, page );
                 pstmt.setInt( 2, version );
@@ -467,6 +479,8 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                     // use Java Date for friendlier comparisons with other dates
                     p.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
                     p.setAuthor( rs.getString( 3 ) );
+                    if( rs.getString(4) != null ) p.setAttribute( WikiPage.CHANGENOTE, rs.getString(4) );
+                    
                 }
 
             }
@@ -497,7 +511,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         {
             con = getConnection();
             String sql = getSQL("getVersions");
-            // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY FROM WIKI_PAGE WHERE PAGE_NAME = ? ORDER BY PAGE_VERSION DESC
+            // SELECT PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_REVNOTE, FROM WIKI_PAGE WHERE PAGE_NAME = ? ORDER BY PAGE_VERSION DESC
             pstmt = con.prepareStatement( sql );
             pstmt.setString( 1, page );
             rs = pstmt.executeQuery();
@@ -509,6 +523,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                 // use Java Date for friendlier comparisons with other dates
                 p.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
                 p.setAuthor( rs.getString( 3 ) );
+                if( rs.getString(4) != null ) p.setAttribute( WikiPage.CHANGENOTE, rs.getString(4) );
                 list.add( p );
             }
         }

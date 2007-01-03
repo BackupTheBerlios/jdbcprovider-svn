@@ -12,9 +12,23 @@ providers for page and attachment content backed by a SQL database.
 
 STATUS
 
-Beta
-Released 2006-08-23
-Tested with JSPWiki 2.4.15-beta and 2.3.40-beta
+Dev Build
+Released 2007-01-03
+Tested with JSPWiki 2.4.65 and 2.5.16
+
+NOTE!
+
+This build only works for Sybase SQL Anywhere. The database specific table creation
+scripts and query property files for MySQL and Sybase ASE need to be updated.
+(New columns for revision notes). Use the sqlany files as a guide as to what must be done.
+
+MOST RECENT CHANGES
+
+* Minor bug fixes
+* Works with latest jspwiki versions
+* Works with multiple wiki instances, i.e. multiple databases
+* Added project files for eclipse
+
 
 RECENT CHANGES
 
