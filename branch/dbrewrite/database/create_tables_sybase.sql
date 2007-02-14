@@ -1,25 +1,27 @@
 CREATE TABLE WIKI_PAGE 
 (
-    PAGE_NAME           nvarchar(100)      NOT NULL,
-    PAGE_VERSION        int                DEFAULT 0 NOT NULL,
-    PAGE_MODIFIED       datetime           NULL,
-    PAGE_MODIFIED_BY    nvarchar(50)       NULL,
-    PAGE_TEXT           text               NULL,
-    CONSTRAINT PK_WIKI_PAGE
-        PRIMARY KEY CLUSTERED (PAGE_NAME, PAGE_VERSION)
+    NAME           nvarchar(100)      NOT NULL,
+    VERSION        int                DEFAULT 0 NOT NULL,
+    CHANGE_TIME    datetime           NULL,
+    CHANGE_BY      nvarchar(50)       NULL,
+    CHANGE_NOTE    nvarchar (100)     NULL,
+    CONTENT        text               NULL,
+    
+    CONSTRAINT     PK_WIKI_PAGE       PRIMARY KEY CLUSTERED (NAME, VERSION)
 ) LOCK DATAROWS
-CREATE INDEX IX_PAGE_MODIFIED ON WIKI_PAGE (PAGE_MODIFIED)
+CREATE INDEX       WIKI_PAGE_CHANGE_TIME_IX ON WIKI_PAGE (CHANGE_TIME)
 
 CREATE TABLE WIKI_ATT
 (
-    ATT_PAGENAME        nvarchar(100)       NOT NULL,
-    ATT_FILENAME        nvarchar(100)       NOT NULL,
-    ATT_VERSION         int                 DEFAULT 0 NOT NULL ,
-    ATT_MODIFIED        datetime            NULL,
-    ATT_MODIFIED_BY     nvarchar(50)        NULL,
-    ATT_DATA            image               NULL,
-    ATT_LENGTH          int                 NULL,
-    CONSTRAINT PK_ATT_PAGE
-        PRIMARY KEY CLUSTERED (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION),
+    PAGENAME       nvarchar(100)       NOT NULL,
+    FILENAME       nvarchar(100)       NOT NULL,
+    VERSION        int                 DEFAULT 0 NOT NULL ,
+    CHANGE_TIME    datetime            NULL,
+    CHANGE_BY      nvarchar(50)        NULL,
+    CHANGE_NOTE    nvarchar(100)       NULL,
+    DATA           image               NULL,
+    LENGTH         int                 NULL,
+    
+    CONSTRAINT     PK_WIKI_ATT         PRIMARY KEY CLUSTERED (PAGENAME, FILENAME, VERSION)
 )LOCK DATAROWS
-CREATE INDEX WIKI_ATT_MODIFIED_IX ON WIKI_ATT (ATT_MODIFIED)
+CREATE INDEX       WIKI_ATT_CHANGE_TIME_IX ON WIKI_ATT (CHANGE_TIME)

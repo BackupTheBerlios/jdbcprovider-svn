@@ -19,21 +19,41 @@
  */
 package com.forthgo.jspwiki.jdbcprovider;
 
-import com.ecyrd.jspwiki.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Properties;
+
+import org.apache.log4j.Logger;
+
+import com.ecyrd.jspwiki.FileUtil;
+import com.ecyrd.jspwiki.NoRequiredPropertyException;
+import com.ecyrd.jspwiki.QueryItem;
+import com.ecyrd.jspwiki.WikiEngine;
+import com.ecyrd.jspwiki.WikiPage;
+import com.ecyrd.jspwiki.WikiProvider;
 import com.ecyrd.jspwiki.attachment.Attachment;
 import com.ecyrd.jspwiki.attachment.AttachmentManager;
 import com.ecyrd.jspwiki.providers.ProviderException;
 import com.ecyrd.jspwiki.providers.WikiAttachmentProvider;
 import com.ecyrd.jspwiki.util.ClassUtil;
-import org.apache.log4j.Category;
-
-import java.io.*;
-import java.sql.*;
-import java.util.*;
-import java.util.Date;
 
 /*
  * History:
+ * 	 2007-02-13 MT Changed logging to log4j.Logger in stead of deprecateded log4j.Category
  *   2006-09-30 MCT Added missing check for version == WikiProvider.LATEST_VERSION
  *   				in getAttachmentInfo(). Slight refactoring of params to findLatestVersion().
  *   2006-08-25 SBG Touching up connection and prepared statement cleanup
@@ -69,7 +89,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
     
 	WikiEngine m_WikiEngine;
  
-    protected static final Category log = Category.getInstance( JDBCAttachmentProvider.class );
+    protected static final Logger log = Logger.getLogger( JDBCAttachmentProvider.class );
     
     public String getProviderInfo() {
         return "JDBC attachment provider";
@@ -210,7 +230,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         try {
             connection = getConnection();
             String sql = getSQL("getList");
-            //SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? ORDER BY ATT_FILENAME, ATT_VERSION DESC;
+            //SELECT ATT_LENGTH, ATT_FILENAME, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_REVNOTE, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? ORDER BY ATT_FILENAME, ATT_VERSION DESC;
             
             pstmt = connection.prepareStatement( sql );
             pstmt.setString( 1, page.getName() );
@@ -227,7 +247,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 // use Java Date for friendlier comparisons with other dates
                 att.setLastModified(new java.util.Date(rs.getTimestamp(3).getTime()));
                 att.setAuthor( rs.getString( 4 ) );
-                att.setVersion( rs.getInt( 5 ) );
+                if( rs.getString(5) != null ) att.setAttribute( WikiPage.CHANGENOTE, rs.getString(5) );
+                att.setVersion( rs.getInt( 6 ) );
                 result.add( att );
                 previousFileName = fileName.toString();
             }
@@ -254,7 +275,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         try {
             connection = getConnection();
             String sql = getSQL("getChanged");
-            // SELECT ATT_PAGENAME, ATT_FILENAME, LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION
+            // SELECT ATT_PAGENAME, ATT_FILENAME, LENGTH(ATT_DATA), ATT_MODIFIED, ATT_MODIFIED_BY, ATT_REVNOTE, ATT_VERSION
             // FROM WIKI_ATT WHERE ATT_MODIFIED > ? ORDER BY ATT_MODIFIED DESC
             
             pstmt = connection.prepareStatement( sql );
@@ -266,7 +287,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 // use Java Date for friendlier comparisons with other dates
                 att.setLastModified(new java.util.Date(rs.getTimestamp(4).getTime()));
                 att.setAuthor( rs.getString( 5 ) );
-                att.setVersion( rs.getInt( 6 ) );
+                if( rs.getString(6) != null ) att.setAttribute( WikiPage.CHANGENOTE, rs.getString(6) );
+                att.setVersion( rs.getInt( 7 ) );
                 changedList.add( att );
             }
         } catch( SQLException se ) {
@@ -289,7 +311,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         try {
             connection = getConnection();
             String sql = getSQL("getInfo");   // latest version is first
-            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
+            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_REVNOTE FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? AND ATT_VERSION = ?
             
             pstmt = connection.prepareStatement( sql );
             pstmt.setString( 1, page.getName() );
@@ -305,6 +327,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 att.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
                 att.setAuthor( rs.getString( 3 ) );
                 att.setVersion( version );
+                if( rs.getString(4) != null ) att.setAttribute( WikiPage.CHANGENOTE, rs.getString(4) );
             } else {
                 debug( "No attachment info for " + page + "/" + name + ":" + version );
             }
@@ -358,7 +381,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
         try {
             connection = getConnection();
             String sql = getSQL("getVersions");   // latest version is first
-            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
+            // SELECT ATT_LENGTH, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_REVNOTE, ATT_VERSION FROM WIKI_ATT WHERE ATT_PAGENAME = ? AND ATT_FILENAME = ? ORDER BY ATT_VERSION DESC
             
             pstmt = connection.prepareStatement( sql );
             pstmt.setString( 1, att.getParentName() );
@@ -371,7 +394,8 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
                 // use Java Date for friendlier comparisons with other dates
                 vAtt.setLastModified(new java.util.Date(rs.getTimestamp(2).getTime()));
                 vAtt.setAuthor( rs.getString(3) );
-                vAtt.setVersion( rs.getInt(4) );
+                if( rs.getString(4) != null ) vAtt.setAttribute( WikiPage.CHANGENOTE, rs.getString(4) );
+                vAtt.setVersion( rs.getInt(5) );
                 list.add( vAtt );
             }
             
@@ -494,7 +518,7 @@ public class JDBCAttachmentProvider extends JDBCBaseProvider
             m_migrating = false;
         }
     }
-    public Category getLog() {
+    public Logger getLog() {
         return log;
     }
 

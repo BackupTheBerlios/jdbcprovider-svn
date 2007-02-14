@@ -9,28 +9,35 @@
 
 package com.forthgo.jspwiki.jdbcprovider;
 
-import com.ecyrd.jspwiki.InternalWikiException;
-import com.ecyrd.jspwiki.NoRequiredPropertyException;
-import com.ecyrd.jspwiki.WikiEngine;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+
 import org.apache.commons.dbcp.ConnectionFactory;
 import org.apache.commons.dbcp.DriverManagerConnectionFactory;
 import org.apache.commons.dbcp.PoolableConnectionFactory;
 import org.apache.commons.dbcp.PoolingDriver;
 import org.apache.commons.pool.impl.GenericObjectPool;
-import org.apache.log4j.Category;
+import org.apache.log4j.Logger;
+
+import com.ecyrd.jspwiki.InternalWikiException;
+import com.ecyrd.jspwiki.NoRequiredPropertyException;
+import com.ecyrd.jspwiki.WikiEngine;
+
+/*
+ * History:
+ * 	 2007-02-13 MT Got rid of 'factory' property since it's not used anyway
+ *                 Changed logging to log4j.Logger in stead of deprecateded log4j.Category
+ */
 
 /**
- *
+ * @author Mikkel Troest
  * @author glasius
  */
 public class DBCPConnectionProvider extends ConnectionProvider {
-    protected static final Category log = Category.getInstance( DBCPConnectionProvider.class );
+    protected static final Logger log = Logger.getLogger( DBCPConnectionProvider.class );
 
-    private String factory;
     private String driver;
     private String url;
     private String username;
@@ -43,18 +50,17 @@ public class DBCPConnectionProvider extends ConnectionProvider {
     public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {
         log.debug("Initializing DBCPConnectionProvider");
 
-        factory = WikiEngine.getRequiredProperty(config, "dbcp.factory");
         driver = WikiEngine.getRequiredProperty(config, "dbcp.driverClassName");
         url = WikiEngine.getRequiredProperty(config, "dbcp.url");
         username = WikiEngine.getRequiredProperty(config, "dbcp.username");
         password = WikiEngine.getRequiredProperty(config, "dbcp.password");
-        log.debug("-factory: "+factory+", driver: "+driver+", url: "+url+", username: "+username);
+        log.debug("driver: "+driver+", url: "+url+", username: "+username);
         
         GenericObjectPool connectionPool = new GenericObjectPool(null);
 
         ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
         
-		new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
+        new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
 		
         PoolingDriver drv;
         
@@ -78,6 +84,5 @@ public class DBCPConnectionProvider extends ConnectionProvider {
     public Connection getConnection(WikiEngine engine) throws SQLException {
             return DriverManager.getConnection("jdbc:apache:commons:dbcp:"+engine.getApplicationName());
     }
-
-
+    
 }

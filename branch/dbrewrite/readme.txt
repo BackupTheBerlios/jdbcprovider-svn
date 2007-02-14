@@ -136,33 +136,37 @@ On Sybase do this:
 
 On Mysql do this:
 
-INSERT INTO wiki_page (PAGE_NAME, PAGE_VERSION, PAGE_MODIFIED, PAGE_MODIFIED_BY, PAGE_TEXT)
+INSERT INTO WIKI_PAGE (NAME, VERSION, CHANGE_TIME, CHANGE_BY, CONTENT)
        SELECT VERSION_NAME, VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY, VERSION_TEXT
-              FROM YourOldDB.wiki_page_versions;
+              FROM your_old_db.WIKI_PAGE_VERSIONS;
 
-INSERT INTO wiki_att (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, ATT_LENGTH)
+INSERT INTO WIKI_ATT (PAGENAME, FILENAME, VERSION, CHANGE_TIME, CHANGE_BY, DATA, LENGTH)
        SELECT ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, LENGTH(ATT_DATA)
-              FROM YourOldDB.wiki_att;
+              FROM your_old_db.WIKI_ATT;
 
 CONTENTS
 
   readme.txt -- this file
   dist/JDBCProvider.jar -- put this in webapps/.../WEB-INF/lib
   lib/
-    commons-dbcp-1.2.1.jar -- these three are needed if you chose to use a
-    commons-lang-2.1.jar   -- DBCP pool for your database connections
-    commons-pool-1.2.jar
+    commons-dbcp-1.2.1.jar -- these two are needed if you chose to use a
+    commons-pool-1.2.jar   -- DBCP pool for your database connections
+
   database/
-    create_tables_mssql.sql -- MS SQL Server code to create the necessary DB tables
+
     create_tables_mysql.sql -- MySQL Server code to create the necessary DB tables
     create_tables_mysql_utf8.sql -- MySQL Server code to create the necessary 
                                     DB tables with the utf8 charset
     create_tables_sybase.sql -- Sybase code to create the necessary DB tables
+    create_tables_sqlany.sql -- SQLAnywhere code to create the necessary DB tables
+    create_tables_pgsql.sql -- PostGreSQL code to create the necessary DB tables
     jspwiki.additional.properties -- Properties that must be merged into jspwiki.properties
     jdbcprovider.properties -- JDBCProvider configuration file, where DB is configured
     jdbcprovider.mysql.properties -- SQL statements for MySQL DB
     jdbcprovider.sybase.properties -- SQL statements for Sybase DB
-
+    jdbcprovider.sqlany.properties -- SQL statements for SQLAnywhere DB
+    jdbcprovider.pgsql.properties -- SQL statements for PostGreSQL DB
+    
 TEAM MEMBERS
 
 Xan Gregg

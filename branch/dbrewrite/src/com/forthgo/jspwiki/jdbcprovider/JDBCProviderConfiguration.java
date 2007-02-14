@@ -7,18 +7,21 @@
 
 package com.forthgo.jspwiki.jdbcprovider;
 
-import com.ecyrd.jspwiki.InternalWikiException;
-import com.ecyrd.jspwiki.NoRequiredPropertyException;
-import com.ecyrd.jspwiki.TextUtil;
-import com.ecyrd.jspwiki.WikiEngine;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
-import org.apache.log4j.Category;
+
+import org.apache.log4j.Logger;
+
+import com.ecyrd.jspwiki.InternalWikiException;
+import com.ecyrd.jspwiki.NoRequiredPropertyException;
+import com.ecyrd.jspwiki.TextUtil;
+import com.ecyrd.jspwiki.WikiEngine;
 
 /*
  * History:
+ * 	 2007-02-13 MT  Changed logging to log4j.Logger in stead of deprecateded log4j.Category
  *   2006-04-26 MT  Added WikiEngine member and changed constructor declaration
  *                  to JDBCProviderConfiguration( WikiEngine, String).
  *                  This was necessary to be able to access the getRootPath()
@@ -37,7 +40,7 @@ import org.apache.log4j.Category;
  */
 public class JDBCProviderConfiguration {
     
-    protected static final Category log = Category.getInstance( JDBCProviderConfiguration.class );
+    protected static final Logger log = Logger.getLogger( JDBCProviderConfiguration.class );
     
     private Properties config ;
     private Properties sql;

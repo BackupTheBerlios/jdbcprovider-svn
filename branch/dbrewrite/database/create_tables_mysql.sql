@@ -1,25 +1,30 @@
 CREATE TABLE WIKI_PAGE
     (
-        PAGE_NAME          VARCHAR (100)  NOT NULL,
-        PAGE_VERSION       INTEGER        NOT NULL,
-        PAGE_MODIFIED      DATETIME,
-        PAGE_MODIFIED_BY   VARCHAR (50),
-        PAGE_TEXT          MEDIUMTEXT,
-        PRIMARY KEY (PAGE_NAME, PAGE_VERSION),
-        UNIQUE (PAGE_NAME, PAGE_VERSION),
-        INDEX PAGE_MODIFIED_IX (PAGE_MODIFIED)
+        NAME               VARCHAR (100)    NOT NULL,
+        VERSION            INTEGER          NOT NULL,
+        CHANGE_TIME        DATETIME,
+        CHANGE_BY          VARCHAR (50)     NOT NULL,
+        CHANGE_NOTE        VARCHAR (100),
+        CONTENT            MEDIUMTEXT       NOT NULL,
+        
+        PRIMARY KEY        (NAME, VERSION),
+        UNIQUE KEY         NAME             (NAME, VERSION),
+        KEY                WIKI_PAGE_CHANGE_TIME_IX   (CHANGE_TIME)
     );
 
 CREATE TABLE WIKI_ATT
     (
-        ATT_PAGENAME      VARCHAR (100)  NOT NULL,
-        ATT_FILENAME      VARCHAR (100)  NOT NULL,
-        ATT_VERSION       INTEGER        NOT NULL,
-        ATT_MODIFIED      DATETIME,
-        ATT_MODIFIED_BY   VARCHAR (50),
-        ATT_DATA          MEDIUMBLOB,
-        ATT_LENGTH        INTEGER,
-        PRIMARY KEY (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION),
-        UNIQUE (ATT_PAGENAME, ATT_FILENAME, ATT_VERSION),
-        INDEX ATT_MODIFIED_IX (ATT_MODIFIED)
+        PAGENAME           VARCHAR (100)    NOT NULL,
+        FILENAME           VARCHAR (100)    NOT NULL,
+        VERSION            INTEGER          NOT NULL,
+        CHANGE_TIME        DATETIME,
+        CHANGE_BY          VARCHAR (50)     NOT NULL,
+        CHANGE_NOTE        VARCHAR (100),
+        DATA               MEDIUMBLOB,
+        LENGTH             INTEGER,
+        
+        PRIMARY KEY        (PAGENAME,FILENAME,VERSION),
+        UNIQUE KEY         PAGENAME         (PAGENAME,FILENAME,VERSION),
+        KEY                WIKI_ATT_CHANGE_TIME_IX   (CHANGE_TIME)
     );
+

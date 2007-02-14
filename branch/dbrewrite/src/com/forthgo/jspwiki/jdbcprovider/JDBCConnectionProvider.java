@@ -1,5 +1,5 @@
 /*
- * DatabaseConnectionProvider.java
+ * JDBCConnectionProvider.java
  *
  * Created on 20. marts 2006, 15:20
  *
@@ -17,18 +17,23 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
+/*
+ * History:
+ * 	 2007-02-14 MT  Renamed this class to JDBCConnectionProvider
+ */
+
 /**
- *
+ * @author Mikkel Troest
  * @author glasius
  */
-public class DatabaseConnectionProvider extends ConnectionProvider {
+public class JDBCConnectionProvider extends ConnectionProvider {
     
     private String url;
     private String username;
     private String password;
     
-    /** Creates a new instance of DatabaseConnectionProvider */
-    public DatabaseConnectionProvider() {
+    /** Creates a new instance of JDBCConnectionProvider */
+    public JDBCConnectionProvider() {
     }
 
     public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {

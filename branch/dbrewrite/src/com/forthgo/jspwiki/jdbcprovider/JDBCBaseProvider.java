@@ -19,17 +19,23 @@
  */
 package com.forthgo.jspwiki.jdbcprovider;
 
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+
+import org.apache.log4j.Logger;
+
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.WikiEngine;
 import com.ecyrd.jspwiki.WikiProvider;
-import org.apache.log4j.Category;
-
-import java.io.IOException;
-import java.sql.*;
-import java.util.Properties;
 
 /*
  * History:
+ * 	 2007-02-13 MT Changed logging to log4j.Logger in stead of deprecateded log4j.Category
+ * 
  *   2006-04-26 MT Changed property name: 'jspwiki.pageProvider.configuration'
  *                 to 'jspwiki.jdbcprovider.configuration'
  *                 Changed instantiation of JDBCProviderConfiguration to include
@@ -94,7 +100,7 @@ public abstract class JDBCBaseProvider implements WikiProvider {
         return sql;
     }
     
-    public abstract Category getLog();
+    public abstract Logger getLog();
     
     protected void debug( String message ) {
         getLog().debug( message );
