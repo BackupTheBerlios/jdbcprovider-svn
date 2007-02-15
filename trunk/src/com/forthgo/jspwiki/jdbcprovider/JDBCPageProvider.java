@@ -52,6 +52,9 @@ import com.ecyrd.jspwiki.util.ClassUtil;
 
 /*
  * History:
+ *   2007-02-15 MT  Fixed migratePages() if a page didn't have an author attribute,
+ *                  a SQLException was thrown, since CHANGE_BY is marked NOT NULL in the schema.
+ *                  Now the author is simply set to "nobody".
  * 	 2007-02-13 MT  Changed logging to log4j.Logger in stead of deprecateded log4j.Category
  *                  Added method pageExists(String, int) to support the VersioningProvider interface
  *   2007-02-12 MT  Fixed migratePages() to comply with new schema/sql (added PAGE_REVNOTE)
@@ -717,7 +720,8 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                         pstmt.setInt( 2, page.getVersion() );
 
                         pstmt.setTimestamp( 3, new Timestamp(page.getLastModified().getTime()));
-                        pstmt.setString( 4, page.getAuthor() );
+                        if(page.getAuthor() != null) pstmt.setString( 4, page.getAuthor() );
+                        else pstmt.setString( 4, "nobody" );
                         pstmt.setString(5, (String)page.getAttribute(WikiPage.CHANGENOTE));
                         pstmt.setString( 6, text );
                         pstmt.execute();
@@ -731,7 +735,8 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
                         pstmt.setInt( 2, latest.getVersion() );
 
                         pstmt.setTimestamp( 3, new Timestamp(latest.getLastModified().getTime()));
-                        pstmt.setString( 4, latest.getAuthor() );
+                        if(latest.getAuthor() != null) pstmt.setString( 4, latest.getAuthor() );
+                        else pstmt.setString( 4, "nobody" );
                         pstmt.setString(5, (String)latest.getAttribute(WikiPage.CHANGENOTE));
                         pstmt.setString( 6, text );
                         pstmt.execute();

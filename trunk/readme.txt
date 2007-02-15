@@ -16,17 +16,12 @@ Dev Build
 Released 2007-01-03
 Tested with JSPWiki 2.4.65 and 2.5.16
 
-NOTE!
-
-This build only works for Sybase SQL Anywhere. The database specific table creation
-scripts and query property files for MySQL and Sybase ASE need to be updated.
-(New columns for revision notes). Use the sqlany files as a guide as to what must be done.
-
 MOST RECENT CHANGES
 
 * Minor bug fixes
 * Works with latest jspwiki versions
 * Works with multiple wiki instances, i.e. multiple databases
+* Added support for PostgreSQL
 * Added project files for eclipse
 
 
@@ -77,7 +72,7 @@ Note: Both the WIKI_PAGE and WIKI_ATT table must be empty (truncated).
 
 * Copy jspwiki.properties in your temp direcory
 
-* Edit the copy of the just copied version of jspwiki.properties so that you have
+* Edit the just copied version of jspwiki.properties so that you have
 
 jspwiki.pageProvider =VersioningFileProvider (your old page provider)
 jspwiki.fileSystemProvider.pageDir =/data/wiki/pages (the folder with your wiki pages)
