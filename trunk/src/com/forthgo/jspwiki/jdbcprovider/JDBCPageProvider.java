@@ -52,6 +52,7 @@ import com.ecyrd.jspwiki.util.ClassUtil;
 
 /*
  * History:
+ *   2007-02-16 MT  Renamed sql-prop page.deleteVersions to just page.delete
  *   2007-02-15 MT  Fixed migratePages() if a page didn't have an author attribute,
  *                  a SQLException was thrown, since CHANGE_BY is marked NOT NULL in the schema.
  *                  Now the author is simply set to "nobody".
@@ -87,6 +88,7 @@ import com.ecyrd.jspwiki.util.ClassUtil;
  * Based on Thierry Lach's DatabaseProvider, which supported Wiki pages
  * but not attachments.
  *
+ * @author Mikkel Troest
  * @author Thierry Lach
  * @author Xan Gregg
  * @author Søren Berg Glasius
@@ -617,7 +619,7 @@ public class JDBCPageProvider extends JDBCBaseProvider implements WikiPageProvid
         try
         {
             connection = getConnection();
-            String sql = getSQL("deleteVersions");
+            String sql = getSQL("delete");
             // DELETE FROM WIKI_PAGE WHERE VERSION_NAME = ?
             psVer = connection.prepareStatement( sql );
             psVer.setString( 1, pageName );

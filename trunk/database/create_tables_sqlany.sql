@@ -3,7 +3,7 @@
 -------------------------------------------------
 
 
-CREATE TABLE "DBA"."PAGE"
+CREATE TABLE "DBA"."WIKI_PAGE"
 (
     "NAME"              varchar(100) NOT NULL,
     "VERSION"           integer NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE "DBA"."PAGE"
     PRIMARY KEY         ("NAME", "VERSION")
 )
 go
-CREATE TABLE "DBA"."ATTACH"
+CREATE TABLE "DBA"."WIKI_ATT"
 (
     "PAGENAME"          varchar(100) NOT NULL,
     "FILENAME"          varchar(100) NOT NULL,
@@ -34,7 +34,7 @@ go
 --   Add indexes
 -------------------------------------------------
 
-CREATE INDEX "WIKI_PAGE_CHANGE_TIME_IX" ON "DBA"."PAGE"
+CREATE INDEX "WIKI_PAGE_CHANGE_TIME_IX" ON "DBA"."WIKI_PAGE"
 (
     "CHANGE_TIME" ASC
 )
@@ -42,7 +42,7 @@ go
 commit work
 go
 
-CREATE INDEX "WIKI_ATT_CHANGE_TIME_IX" ON "DBA"."ATTACH"
+CREATE INDEX "WIKI_ATT_CHANGE_TIME_IX" ON "DBA"."WIKI_ATT"
 (
     "CHANGE_TIME" ASC
 )

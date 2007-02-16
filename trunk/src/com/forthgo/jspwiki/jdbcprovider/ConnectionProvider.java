@@ -23,6 +23,7 @@ import java.util.Properties;
  */
 
 /**
+ * @author Milton Taylor
  * @author Mikkel Troest
  * @author glasius
  */

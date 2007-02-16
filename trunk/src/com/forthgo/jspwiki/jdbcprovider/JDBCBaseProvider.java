@@ -61,6 +61,8 @@ import com.ecyrd.jspwiki.WikiProvider;
  * value greater than 1 indicates the minimum number of connections for
  * a connection pool.
  *
+ * @author Mikkel Troest
+ * @author Xan Gregg
  */
 public abstract class JDBCBaseProvider implements WikiProvider {
     

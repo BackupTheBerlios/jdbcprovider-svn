@@ -36,7 +36,7 @@ import com.ecyrd.jspwiki.WikiEngine;
 /**
  *
  * @author Mikkel Troest
- * @author glasius
+ * @author Søren Berg Glasius
  */
 public class JDBCProviderConfiguration {
     

@@ -28,8 +28,9 @@ MOST RECENT CHANGES
 RECENT CHANGES
 
 All SQL code has been pulled out into separate properties files for easier
-adaption to other databases. Currently there are two flavours supported: mysql 
-and sybase. Adapting it to other databases should be close to trivial :-)
+adaption to other databases. Currently there are four flavours supported: mysql, 
+sqlanywhere, postgresql, and sybase.
+Adapting it to other databases should be close to trivial :-)
 
 INSTALL
 

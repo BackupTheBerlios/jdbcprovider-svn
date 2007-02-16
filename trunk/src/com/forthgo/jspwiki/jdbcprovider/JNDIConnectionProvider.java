@@ -28,7 +28,7 @@ import javax.sql.DataSource;
 
 /**
  * @author Mikkel Troest
- * @author glasius
+ * @author Søren Berg Glasius
  */
 public class JNDIConnectionProvider extends ConnectionProvider {
     
