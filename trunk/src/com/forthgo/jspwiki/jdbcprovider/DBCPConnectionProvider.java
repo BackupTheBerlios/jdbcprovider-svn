@@ -10,25 +10,25 @@
 package com.forthgo.jspwiki.jdbcprovider;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Enumeration;
 import java.util.Properties;
 
-import org.apache.commons.dbcp.ConnectionFactory;
-import org.apache.commons.dbcp.DriverManagerConnectionFactory;
-import org.apache.commons.dbcp.PoolableConnectionFactory;
-import org.apache.commons.dbcp.PoolingDriver;
-import org.apache.commons.pool.impl.GenericObjectPool;
+import javax.sql.DataSource;
+
+import org.apache.commons.dbcp.BasicDataSourceFactory;
 import org.apache.log4j.Logger;
 
-import com.ecyrd.jspwiki.InternalWikiException;
 import com.ecyrd.jspwiki.NoRequiredPropertyException;
 import com.ecyrd.jspwiki.WikiEngine;
 
 /*
  * History:
- * 	 2007-02-13 MT Got rid of 'factory' property since it's not used anyway
- *                 Changed logging to log4j.Logger in stead of deprecateded log4j.Category
+ *   2007-02-19 MT  Total rewrite. Now uses BasicDataSourceFactory.
+ *   2007-02-18 MT  Added support for additional driver properties.
+ *                  - moved username/password members to properties.
+ * 	 2007-02-13 MT  Got rid of 'factory' property since it's not used anyway
+ *                  Changed logging to log4j.Logger in stead of deprecateded log4j.Category
  */
 
 /**
@@ -38,10 +38,9 @@ import com.ecyrd.jspwiki.WikiEngine;
 public class DBCPConnectionProvider extends ConnectionProvider {
     protected static final Logger log = Logger.getLogger( DBCPConnectionProvider.class );
 
-    private String driver;
-    private String url;
-    private String username;
-    private String password;
+    private static final String PREFIX = "dbcp";
+    
+    private DataSource ds = null;
     
     /** Creates a new instance of DBCPConnectionProvider */
     public DBCPConnectionProvider()  {
@@ -50,39 +49,39 @@ public class DBCPConnectionProvider extends ConnectionProvider {
     public void initialize(WikiEngine engine, final Properties config) throws NoRequiredPropertyException {
         log.debug("Initializing DBCPConnectionProvider");
 
-        driver = WikiEngine.getRequiredProperty(config, "dbcp.driverClassName");
-        url = WikiEngine.getRequiredProperty(config, "dbcp.url");
-        username = WikiEngine.getRequiredProperty(config, "dbcp.username");
-        password = WikiEngine.getRequiredProperty(config, "dbcp.password");
-        log.debug("driver: "+driver+", url: "+url+", username: "+username);
+        Properties connectionProperties = parseAdditionalProperties(config, DRIVER_PROP_PREFIX);
         
-        GenericObjectPool connectionPool = new GenericObjectPool(null);
-
-        ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
+        Properties dbcpProps = parseAdditionalProperties(config, PREFIX);
+        dbcpProps.put("driverClassName", WikiEngine.getRequiredProperty(config, PREFIX+".driverClassName"));
+        dbcpProps.put("url", WikiEngine.getRequiredProperty(config, PREFIX+".url"));
+        dbcpProps.put("username", WikiEngine.getRequiredProperty(config, PREFIX+".username"));
+        dbcpProps.put("password", WikiEngine.getRequiredProperty(config, PREFIX+".password"));
+        dbcpProps.put("connectionProperties", stringifyProps(connectionProperties, ";"));
+        log.debug("driver: "+dbcpProps.getProperty("user")+", url: "+dbcpProps.getProperty("url")+", username: "+ dbcpProps.getProperty("user"));
         
-        new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true);
-		
-        PoolingDriver drv;
-        
-        try {
-            Class.forName(driver);
-            Class.forName("org.apache.commons.dbcp.PoolingDriver");
-            drv = (PoolingDriver) DriverManager.getDriver("jdbc:apache:commons:dbcp:");
-
-            drv.registerPool(engine.getApplicationName(),connectionPool);
-            
-        } catch (SQLException ex) {
-            log.error("Failed to create ConnectionPool",ex);
-            throw new InternalWikiException("SQLException during connection pool creation: "+ex.getMessage());
-        } catch (ClassNotFoundException ex) {
-            log.error("Failed to create ConnectionPool",ex);
-            throw new InternalWikiException("ClassNotFoundException during connection pool creation: "+ex.getMessage());
+        try{
+        	ds = BasicDataSourceFactory.createDataSource(dbcpProps);
+        }catch(Exception e){
+        	throw new NoRequiredPropertyException(e.getMessage(), null);
         }
+        
     }
 
     
     public Connection getConnection(WikiEngine engine) throws SQLException {
-            return DriverManager.getConnection("jdbc:apache:commons:dbcp:"+engine.getApplicationName());
+            return ds.getConnection();
+    }
+    
+    private String stringifyProps(Properties props, String separator){
+    	String s;
+    	StringBuffer sb = new StringBuffer();
+    	Enumeration e = props.propertyNames();
+      while(e.hasMoreElements()){
+        s = (String) e.nextElement();
+        sb.append(s + "=" + props.getProperty(s)); 
+        if(e.hasMoreElements()) sb.append(separator);
+      }
+      return sb.toString();
     }
     
 }

@@ -6,5 +6,6 @@
 	<classpathentry kind="lib" path="C:/Mikkle/Coding/Java/lib/JSPWiki-2.4.91.jar"/>
 	<classpathentry kind="lib" path="lib/commons-dbcp-1.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/commons-pool-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/c3p0-0.9.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
