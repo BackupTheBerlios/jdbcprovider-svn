@@ -13,8 +13,8 @@ providers for page and attachment content backed by a SQL database.
 STATUS
 
 Dev Build
-Released 2007-01-03
-Tested with JSPWiki 2.4.65 and 2.5.16
+Released 2007-02-23
+Tested with JSPWiki 2.3.50, 2.4.91 and 2.5.22
 
 MOST RECENT CHANGES
 
@@ -22,8 +22,12 @@ MOST RECENT CHANGES
 * Works with latest jspwiki versions
 * Works with multiple wiki instances, i.e. multiple databases
 * Added support for PostgreSQL
-* Added project files for eclipse
-
+* Added support for Microsoft SQL Server
+* Added support for driver-specific connection properties
+* Added support for DBCP connection pools
+* Added support for C3P0 connection pools
+* Added support for JNDI data sources
+* Added support for DBCP- and C3P0-specifc pool properties
 
 RECENT CHANGES
 
@@ -39,8 +43,9 @@ INSTALL
 
 Basically,
  - Copy the dist/JDBCProvider.jar file into JSPWiki's WEB-INF/lib directory.
- - If you are planing to use DBCP copy the three jar files in lib
-   to WEB-INF/lib 
+ - If you are planing to use DBCP, copy commons-dbcp-1.2.1.jar and commons-pool-1.2.jar
+   in lib  to WEB-INF/lib 
+ - If you are planning to use C3P0, copy c3p0-0.9.1.jar in lib to WEB-INF/lib
  - Copy the appropiate databasedriver to WEB-INF/lib
  - Copy the jdbcprovider.properties into WEB-INF directory
  - Edit the jdbcprovider.properties so that it reflects your favorite database-
@@ -144,28 +149,49 @@ CONTENTS
 
   readme.txt -- this file
   dist/JDBCProvider.jar -- put this in webapps/.../WEB-INF/lib
+  
   lib/
-    commons-dbcp-1.2.1.jar -- these two are needed if you chose to use a
+    commons-dbcp-1.2.1.jar -- The commons-* jars are needed if you will be using
     commons-pool-1.2.jar   -- DBCP pool for your database connections
+ 		c3p0-0.9.1.jar         -- The C3P0 jar is needed if you will be using C3P0 for connection pools
 
   database/
-
     create_tables_mysql.sql -- MySQL Server code to create the necessary DB tables
     create_tables_mysql_utf8.sql -- MySQL Server code to create the necessary 
                                     DB tables with the utf8 charset
     create_tables_sybase.sql -- Sybase code to create the necessary DB tables
     create_tables_sqlany.sql -- SQLAnywhere code to create the necessary DB tables
     create_tables_pgsql.sql -- PostGreSQL code to create the necessary DB tables
+    create_tables_mssql.sql -- Microsoft SQL Server code to create the necessary DB tables
     jspwiki.additional.properties -- Properties that must be merged into jspwiki.properties
     jdbcprovider.properties -- JDBCProvider configuration file, where DB is configured
     jdbcprovider.mysql.properties -- SQL statements for MySQL DB
     jdbcprovider.sybase.properties -- SQL statements for Sybase DB
     jdbcprovider.sqlany.properties -- SQL statements for SQLAnywhere DB
     jdbcprovider.pgsql.properties -- SQL statements for PostGreSQL DB
-    
+    jdbcprovider.mssql.properties -- SQL statements for Microsoft SQL Server
+
+  license/
+    lgpl.txt                -- The Lesser Gnu Public License
+    APACHE-LICENSE-2.0.txt  -- The Apache Software License version 2.0
+
+LICENSE
+
+The JDBCProvider is released under the Lesser GNU Public License (LGPL)
+  Please see license/lgpl.txt for licensing details
+
+The C3P0 components used in this project are released under the Lesser GNU Public License (LGPL)
+  Please see license/lgpl.txt for licensing details
+  C3P0 home: http://www.mchange.com/projects/c3p0
+  
+This project contains software from the Apache Software Foundation (the commons-DBCP and commons-Pool packages)
+  Please see license/APACHE-LICENSE-2.0.txt for licensing details.
+  commons-DBCP home: http://jakarta.apache.org/commons/dbcp/
+  commons-Pool home: http://jakarta.apache.org/commons/pool/
+
 TEAM MEMBERS
 
 Xan Gregg
 Soeren Berg Glasius
 Mikkel Troest
-
+Milt Taylor
