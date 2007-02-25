@@ -12,8 +12,8 @@ providers for page and attachment content backed by a SQL database.
 
 STATUS
 
-Dev Build
-Released 2007-02-23
+Beta release
+Released 2007-02-28
 Tested with JSPWiki 2.3.50, 2.4.91 and 2.5.22
 
 MOST RECENT CHANGES
@@ -21,6 +21,8 @@ MOST RECENT CHANGES
 * Minor bug fixes
 * Works with latest jspwiki versions
 * Works with multiple wiki instances, i.e. multiple databases
+* Change notes are now supported
+* The VersionongProvider interface is now implemented
 * Added support for PostgreSQL
 * Added support for Microsoft SQL Server
 * Added support for driver-specific connection properties
@@ -32,8 +34,8 @@ MOST RECENT CHANGES
 RECENT CHANGES
 
 All SQL code has been pulled out into separate properties files for easier
-adaption to other databases. Currently there are four flavours supported: mysql, 
-sqlanywhere, postgresql, and sybase.
+adaption to other databases. Currently there are five flavours supported: mysql, 
+sqlanywhere, mssql, postgresql, and sybase.
 Adapting it to other databases should be close to trivial :-)
 
 INSTALL
@@ -50,7 +52,7 @@ Basically,
  - Copy the jdbcprovider.properties into WEB-INF directory
  - Edit the jdbcprovider.properties so that it reflects your favorite database-
    connection option.
- - Copy the jdbcprovider.sybase.properties or jdbcprovider.mysql.properties into
+ - Copy the jdbcprovider.<flavour>.properties (e.g. jdbcprovider.sybase.properties) into
    WEB-INF directory
  - Merge the jspwiki.aditional.properties file into the jspwiki.properties file.
    Remember to remove the current page and attachment providers.
@@ -139,41 +141,42 @@ On Mysql do this:
 
 INSERT INTO WIKI_PAGE (NAME, VERSION, CHANGE_TIME, CHANGE_BY, CONTENT)
        SELECT VERSION_NAME, VERSION_NUM, VERSION_MODIFIED, VERSION_MODIFIED_BY, VERSION_TEXT
-              FROM your_old_db.WIKI_PAGE_VERSIONS;
+              FROM <your_old_db>.WIKI_PAGE_VERSIONS;
 
 INSERT INTO WIKI_ATT (PAGENAME, FILENAME, VERSION, CHANGE_TIME, CHANGE_BY, DATA, LENGTH)
        SELECT ATT_PAGENAME, ATT_FILENAME, ATT_VERSION, ATT_MODIFIED, ATT_MODIFIED_BY, ATT_DATA, LENGTH(ATT_DATA)
-              FROM your_old_db.WIKI_ATT;
+              FROM <your_old_db>.WIKI_ATT;
 
 CONTENTS
 
   readme.txt -- this file
-  dist/JDBCProvider.jar -- put this in webapps/.../WEB-INF/lib
+  dist/
+    JDBCProvider.jar -- put this in webapps/.../WEB-INF/lib
   
   lib/
-    commons-dbcp-1.2.1.jar -- The commons-* jars are needed if you will be using
-    commons-pool-1.2.jar   -- DBCP pool for your database connections
- 		c3p0-0.9.1.jar         -- The C3P0 jar is needed if you will be using C3P0 for connection pools
+    commons-dbcp-1.2.1.jar         -- The commons-* jars are needed if you will be using
+    commons-pool-1.2.jar           -- DBCP pool for your database connections
+ 		c3p0-0.9.1.jar                 -- The C3P0 jar is needed if you will be using C3P0 for connection pools
 
   database/
-    create_tables_mysql.sql -- MySQL Server code to create the necessary DB tables
-    create_tables_mysql_utf8.sql -- MySQL Server code to create the necessary 
-                                    DB tables with the utf8 charset
-    create_tables_sybase.sql -- Sybase code to create the necessary DB tables
-    create_tables_sqlany.sql -- SQLAnywhere code to create the necessary DB tables
-    create_tables_pgsql.sql -- PostGreSQL code to create the necessary DB tables
-    create_tables_mssql.sql -- Microsoft SQL Server code to create the necessary DB tables
-    jspwiki.additional.properties -- Properties that must be merged into jspwiki.properties
-    jdbcprovider.properties -- JDBCProvider configuration file, where DB is configured
-    jdbcprovider.mysql.properties -- SQL statements for MySQL DB
+    create_tables_mysql.sql        -- MySQL Server code to create the necessary DB tables
+    create_tables_mysql_utf8.sql   -- MySQL Server code to create the necessary 
+                                      DB tables with the utf8 charset
+    create_tables_sybase.sql       -- Sybase code to create the necessary DB tables
+    create_tables_sqlany.sql       -- SQLAnywhere code to create the necessary DB tables
+    create_tables_pgsql.sql        -- PostGreSQL code to create the necessary DB tables
+    create_tables_mssql.sql        -- Microsoft SQL Server code to create the necessary DB tables
+    jspwiki.additional.properties  -- Properties that must be merged into jspwiki.properties
+    jdbcprovider.properties        -- JDBCProvider configuration file, where DB is configured
+    jdbcprovider.mysql.properties  -- SQL statements for MySQL DB
     jdbcprovider.sybase.properties -- SQL statements for Sybase DB
     jdbcprovider.sqlany.properties -- SQL statements for SQLAnywhere DB
-    jdbcprovider.pgsql.properties -- SQL statements for PostGreSQL DB
-    jdbcprovider.mssql.properties -- SQL statements for Microsoft SQL Server
+    jdbcprovider.pgsql.properties  -- SQL statements for PostGreSQL DB
+    jdbcprovider.mssql.properties  -- SQL statements for Microsoft SQL Server
 
   license/
-    lgpl.txt                -- The Lesser Gnu Public License
-    APACHE-LICENSE-2.0.txt  -- The Apache Software License version 2.0
+    lgpl.txt                       -- The Lesser Gnu Public License
+    APACHE-LICENSE-2.0.txt         -- The Apache Software License version 2.0
 
 LICENSE
 
