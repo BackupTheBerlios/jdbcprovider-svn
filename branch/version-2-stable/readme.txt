@@ -25,7 +25,7 @@ MOST RECENT CHANGES
 * Works with latest jspwiki versions
 * Works with multiple wiki instances, i.e. multiple databases
 * Change notes are now supported
-* The VersionongProvider interface is now implemented
+* The VersioningProvider interface is now implemented
 * Added support for PostgreSQL
 * Added support for Microsoft SQL Server
 * Added support for driver-specific connection properties
