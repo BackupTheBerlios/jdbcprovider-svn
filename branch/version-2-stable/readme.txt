@@ -176,6 +176,7 @@ ARCHIVE CONTENTS
     lib/
       commons-dbcp-1.2.1.jar         -- The commons-* jars are needed if you will be using
       commons-pool-1.2.jar           -- DBCP pool for your database connections
+      commons-collections.jar
       c3p0-0.9.1.jar                 -- The C3P0 jar is needed if you will be using C3P0 for connection pools
 
     database/
