@@ -50,8 +50,8 @@ import com.ecyrd.jspwiki.WikiEngine;
  * @author glasius
  */
 public class JDBCConnectionProvider extends ConnectionProvider {
-  d
-		protected static final Logger log = Logger.getLogger(JDBCConnectionProvider.class);
+  
+	protected static final Logger log = Logger.getLogger(JDBCConnectionProvider.class);
 	
 		private static final String PROP_PREFIX = "jdbc";
 	
